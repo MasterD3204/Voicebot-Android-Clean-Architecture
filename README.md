@@ -17,7 +17,7 @@ Dự án kết hợp sức mạnh của **Hybrid AI Architecture**:
     -   **Local LLM (LiteRT):** Fallback xử lý các câu hỏi mở, sáng tạo (Qwen2.5-1.5B 4-bit).
 -   **Smart TTS Pipeline:**
     -   Tự động chuẩn hóa số liệu ("123" -> "một trăm hai ba").
-    -   **Fast Start:** Phát âm thanh ngay sau 2 từ đầu tiên, không chờ cả câu.
+    -   **Fast Start:** Phát âm thanh ngay từ câu đầu tiên, không chờ toàn bộ text.
     -   **Sentence Queue:** Đảm bảo thứ tự phát dù xử lý song song.
 -   **Performance Metrics:** Hiển thị trực quan độ trễ (TTFT, TTFA, Query Latency) ngay trên màn hình.
 
@@ -28,10 +28,10 @@ Dự án kết hợp sức mạnh của **Hybrid AI Architecture**:
 
 1.  **Audio Input:** `SpeechRecognizer` lắng nghe và chuyển đổi giọng nói.
 2.  **Logic:**
-    *   **QA Engine:** Kiểm tra `qa_database.txt` bằng thuật toán Vector (FastText) + Từ khóa (BM25).
-    *   **LiteRT LLM:** Nếu không tìm thấy, gọi mô hình ngôn ngữ lớn chạy offline (Qwen2.5-1.5B).
+    *   **QA Engine:** Kiểm tra `qa_database.txt` bằng embedding similarity (FastText) + Từ khóa (BM25).
+    *   **LiteRT LLM:** Nếu không tìm thấy, gọi mô hình ngôn ngữ lớn chạy offline (Qwen2.5-1.5B-instruct-8bit).
 3.  **TTS Pipeline:**
-    *   Cắt luồng text thành các câu ngắn.
+    *   Cắt luồng text thành các chunk ngắn theo dấu câu.
     *   Ưu tiên phát ngay cụm 2 từ đầu tiên.
     *   Đẩy vào hàng đợi `AndroidTTSManager`.
 
@@ -49,7 +49,7 @@ Dự án kết hợp sức mạnh của **Hybrid AI Architecture**:
 ## 🚀 Quickstart (Cài đặt & Chạy)
 
 ### 1. Chuẩn bị Môi trường
-*   Cài đặt **Android Studio Koala** trở lên.
+*   Cài đặt **Android Studio**.
 *   JDK 17.
 
 ### 2. Tải Model & Dữ liệu
@@ -59,7 +59,7 @@ Dự án cần các file dữ liệu lớn (không commit lên Git). Hãy tải 
 | :--- | :--- | :--- |
 | `qa_database.txt` | Dữ liệu câu hỏi - trả lời mẫu | `/sdcard/Download/` hoặc Assets |
 | `vi_fasttext_pruned.vec` | Vector từ điển tiếng Việt rút gọn | `/sdcard/Download/` hoặc Assets |
-| `Qwen2.5-1.5B...litertlm` | Model LLM lượng tử hóa (1.5GB) | `/sdcard/Download/` |
+| `https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct.litertlm` | Model LLM lượng tử hóa (1.5GB) | `/sdcard/Download/` |
 
 *(Lưu ý: Bạn có thể đặt file trong `app/src/main/assets` để build cùng app, nhưng sẽ làm tăng kích thước APK đáng kể).*
 
@@ -78,12 +78,11 @@ Dự án cần các file dữ liệu lớn (không commit lên Git). Hãy tải 
 
 ## 📦 Quản lý Model
 
-*   **LLM Model:** [Qwen2.5-1.5B-Instruct-LiteRT](https://huggingface.co/qualcomm/Qwen2.5-1.5B-Instruct-LiteRT) (Format: `.litertlm`).
+*   **LLM Model:** [Qwen2.5-1.5B-Instruct-LiteRT]((https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct)) (Format: `.litertlm`).
 *   **QA Database:** File text đơn giản, định dạng:
     ```text
     Câu hỏi 1 | Câu trả lời 1
-    ===
-    Câu hỏi 2 | Câu trả lời 2 (có thể xuống dòng)
+    Câu hỏi 2 | Câu trả lời 2
     ```
 *   **FastText Vector:** Bản rút gọn 30k từ phổ biến nhất của [CC.vi.300.vec](https://fasttext.cc/docs/en/crawl-vectors.html).
 
@@ -116,7 +115,6 @@ Các chỉ số được hiển thị real-time trên ứng dụng:
 ## 🔐 Quyền riêng tư (Privacy)
 
 *   **Offline First:** Toàn bộ dữ liệu giọng nói và văn bản được xử lý nội bộ.
-*   **Internet:** Chỉ cần thiết nếu bạn bật tính năng Fallback sang Cloud API (Gemini/ChatGPT - mặc định tắt).
 *   **Permissions:**
     *   `RECORD_AUDIO`: Để thu âm.
     *   `READ_EXTERNAL_STORAGE`: Để đọc file Model.
@@ -130,11 +128,7 @@ Các chỉ số được hiển thị real-time trên ứng dụng:
     *   -> Kiểm tra xem bạn đã copy file vào đúng thư mục `/sdcard/Download/` chưa.
     *   -> Kiểm tra quyền truy cập bộ nhớ (Settings -> App -> Permissions).
 
-2.  **Lỗi: Bot tự nói chuyện một mình (Loop)**
-    *   -> Kiểm tra âm lượng loa.
-    *   -> Code đã có cơ chế chặn Mic, nhưng nếu môi trường quá ồn hoặc loa quá lớn, Mic vẫn có thể bắt được tạp âm.
-
-3.  **Lỗi: Crash ngay khi mở (Native Library Error)**
+2.  **Lỗi: Crash ngay khi mở (Native Library Error)**
     *   -> Đảm bảo bạn đang chạy trên thiết bị ARM64 (`arm64-v8a`). Emulator x86 sẽ không chạy được thư viện LiteRT.
 
 ---
