@@ -54,6 +54,7 @@ object EngineFactory {
             LlmType.EXECUTORCH -> ExecuTorchLlmEngine(
                 context = context,
                 modelName = config.execuTorchModelName,
+                tokenizerName = config.execuTorchTokenizerName,
                 systemPrompt = config.llmSystemPrompt,
                 maxTokens = config.llmMaxTokens
             )

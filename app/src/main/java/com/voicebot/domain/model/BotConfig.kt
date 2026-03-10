@@ -18,9 +18,10 @@ data class BotConfig(
 
     // ── LLM credentials / model names ────────────────────────────────────
     val geminiApiKey: String = "",
-    //val liteRtModelName: String = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
-    val liteRtModelName: String = "qwen3-5-2b_q8_ekv128.litertlm",
+    val liteRtModelName: String = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+    //val liteRtModelName: String = "qwen3-5-2b_q8_ekv128.litertlm",
     val execuTorchModelName: String = "model.pte",
+    val execuTorchTokenizerName: String = "tokenizer.json",
     val nativeLlmModelName: String = "model.gguf",
 
     // ── RAG assets ───────────────────────────────────────────────────────
@@ -36,9 +37,9 @@ data class BotConfig(
 
     // ── LLM generation params ─────────────────────────────────────────────
     val llmMaxTokens: Int = 1024,
-    val llmTemperature: Float = 0.1f,
-    val llmTopK: Int = 8,
-    val llmTopP: Float = 0.95f,
+    val llmTemperature: Float = 0.7f,
+    val llmTopK: Int = 20,
+    val llmTopP: Float = 0.8f,
     val llmSystemPrompt: String = "Bạn là trợ lý ảo trả lời ngắn gọn tất cả câu hỏi."
 )
 

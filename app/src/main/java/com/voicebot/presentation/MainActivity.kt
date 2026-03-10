@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun buildBotConfig() = BotConfig(
         sttType = SttType.ANDROID,          // ← swap to SttType.SHERPA_ONNX for offline
-        llmType = LlmType.LITE_RT,          // ← swap to GEMINI_API, EXECUTORCH, NATIVE_CPP
+        llmType = LlmType.EXECUTORCH,          // ← swap to GEMINI_API, EXECUTORCH, NATIVE_CPP
         ragType = RagType.FASTTEXT,         // ← swap to RagType.NONE to disable
         language = "vi-VN",
         geminiApiKey = "",                  // fill in if llmType = GEMINI_API

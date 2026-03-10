@@ -87,4 +87,11 @@ dependencies {
     // LiteRT LLM
     //implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha02")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha06")
+
+    // ExecuTorch Android - dùng version mới nhất
+    implementation("org.pytorch:executorch-android:1.1.0")
+
+    // Coroutines (bạn đã dùng Flow)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
