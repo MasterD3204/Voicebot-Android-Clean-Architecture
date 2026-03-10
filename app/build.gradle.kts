@@ -86,10 +86,11 @@ dependencies {
 
     // LiteRT LLM
     //implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha02")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha06")
     // localagents
     implementation("com.google.ai.edge.localagents:localagents-rag:0.3.0")
     implementation("com.google.mediapipe:tasks-genai:0.10.27")
     // Guava (cho ImmutableList, ListenableFuture)
     implementation("com.google.guava:guava:33.3.1-android")
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha06")
+    
 }
