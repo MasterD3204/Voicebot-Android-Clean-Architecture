@@ -26,6 +26,8 @@ data class BotConfig(
     // ── RAG assets ───────────────────────────────────────────────────────
     val qaAssetFile: String = "qa_database.txt",
     val vectorAssetFile: String = "vi_fasttext_pruned.vec",
+    val qaAssetFile_Gemma: String = "qa_database.txt",
+    val vectorAssetFile_Gemma: String = "embeddinggemma-300m.tflite",
 
     // ── Sherpa-ONNX STT assets (used only when sttType = SHERPA_ONNX) ───
     val sherpaEncoderAsset: String = "model/encoder-epoch-20-avg-10.int8.onnx",
@@ -60,5 +62,6 @@ enum class TtsType {
 
 enum class RagType {
     FASTTEXT,       // FastText word embeddings — requires .vec asset
+    EMBEDDING // Su dung embedding model 
     NONE            // Disable RAG, go straight to LLM
 }
