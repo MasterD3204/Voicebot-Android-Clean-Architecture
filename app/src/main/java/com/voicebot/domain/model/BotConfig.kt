@@ -34,7 +34,7 @@ data class BotConfig(
     val sherpaVadType: Int = 0,           // 0 = Silero VAD, 1 = TenVAD
 
     // ── LLM generation params ─────────────────────────────────────────────
-    val llmMaxTokens: Int = 512,
+    val llmMaxTokens: Int = 1024,
     val llmTemperature: Float = 0.1f,
     val llmTopK: Int = 8,
     val llmTopP: Float = 0.95f,

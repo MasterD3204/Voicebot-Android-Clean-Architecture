@@ -141,17 +141,21 @@ class FastTextRagEngine(private val context: Context) : RagEngine {
         val hashBuilder = StringBuilder()
         try {
             context.assets.open(fileName).bufferedReader().use { reader ->
-                var question: String? = null
                 var line = reader.readLine()
                 while (line != null) {
                     coroutineContext.ensureActive()  // ✅ OK - trong suspend function body
                     val t = line.trim()
-                    when {
-                        t.isEmpty()      -> question = null
-                        question == null  -> question = t.lowercase()
-                        else -> {
-                            question?.let { q -> qaList += QAPair(id++, q, t); hashBuilder.append(q) }
-                            question = null
+                    if (t.isNotBlank()) {
+                        // Format: "câu hỏi|câu trả lời"
+                        // Chỉ lấy phần sau | làm answer để truyền vào LLM context
+                        val pipeIdx = t.indexOf('|')
+                        if (pipeIdx != -1) {
+                            val question = t.substring(0, pipeIdx).trim().lowercase()
+                            val answer   = t.substring(pipeIdx + 1).trim()
+                            if (question.isNotEmpty() && answer.isNotEmpty()) {
+                                qaList += QAPair(id++, question, answer)
+                                hashBuilder.append(question)
+                            }
                         }
                     }
                     line = reader.readLine()
@@ -163,6 +167,7 @@ class FastTextRagEngine(private val context: Context) : RagEngine {
             Log.e(TAG, "Failed to load '$fileName'", e); throw e
         }
     }
+
 
     private suspend fun loadWordVectors(fileName: String) {
         wordVectors.clear()

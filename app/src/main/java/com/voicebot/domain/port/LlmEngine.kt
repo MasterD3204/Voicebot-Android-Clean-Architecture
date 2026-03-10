@@ -22,4 +22,10 @@ interface LlmEngine {
 
     /** Release resources (model weights, connections, etc.) */
     fun release()
+
+    /**
+     * Xóa lịch sử hội thoại, bắt đầu phiên mới.
+     * Mỗi engine tự implement tuỳ cơ chế — default no-op cho engines không giữ state.
+     */
+    fun resetHistory() {}
 }
