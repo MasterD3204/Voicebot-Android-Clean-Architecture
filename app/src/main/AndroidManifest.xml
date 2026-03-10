@@ -23,29 +23,21 @@
         android:largeHeap="true"
         tools:targetApi="31">
 
-        <!--
-        required by qnn
-
-        If you don't add it, you would get an error from the deviceCreate() API
-        and the error code is 14001
-
-        It is located at /vendor/lib64/libcdsprpc.so on your Phone
-        -->
         <uses-native-library
             android:name="libcdsprpc.so"
             android:required="false"/>
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.voicebot.presentation.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.SimulateStreamingAsr">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
         <uses-native-library android:name="libvndksupport.so" android:required="false"/>
         <uses-native-library android:name="libOpenCL.so" android:required="false"/>
     </application>

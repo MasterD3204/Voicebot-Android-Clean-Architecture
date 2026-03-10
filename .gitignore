@@ -10,7 +10,6 @@
 /captures
 .externalNativeBuild
 .cxx
-app/src/main/cpp/
 app/src/main/assets/model
 app/src/main/assets/decoder.onnx
 app/src/main/assets/duration_predictor.onnx

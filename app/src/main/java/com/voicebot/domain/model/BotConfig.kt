@@ -1,0 +1,63 @@
+package com.voicebot.domain.model
+
+/**
+ * Central configuration for the VoiceBot.
+ *
+ * ★ To switch engines, change only the type fields here.
+ *   No other code changes needed — EngineFactory handles the rest.
+ */
+data class BotConfig(
+    // ── Engine selection ──────────────────────────────────────────────────
+    val sttType: SttType = SttType.ANDROID,
+    val llmType: LlmType = LlmType.LITE_RT,
+    val ttsType: TtsType = TtsType.ANDROID,
+    val ragType: RagType = RagType.FASTTEXT,
+
+    // ── Locale ───────────────────────────────────────────────────────────
+    val language: String = "vi-VN",
+
+    // ── LLM credentials / model names ────────────────────────────────────
+    val geminiApiKey: String = "",
+    val liteRtModelName: String = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+    val execuTorchModelName: String = "model.pte",
+    val nativeLlmModelName: String = "model.gguf",
+
+    // ── RAG assets ───────────────────────────────────────────────────────
+    val qaAssetFile: String = "qa_database.txt",
+    val vectorAssetFile: String = "vi_fasttext_pruned.vec",
+
+    // ── Sherpa-ONNX STT assets (used only when sttType = SHERPA_ONNX) ───
+    val sherpaEncoderAsset: String = "model/encoder-epoch-20-avg-10.int8.onnx",
+    val sherpaDecoderAsset: String = "model/decoder-epoch-20-avg-10.int8.onnx",
+    val sherpaJoinerAsset: String = "model/joiner-epoch-20-avg-10.int8.onnx",
+    val sherpaTokensAsset: String = "model/tokens.txt",
+    val sherpaVadType: Int = 0,           // 0 = Silero VAD, 1 = TenVAD
+
+    // ── LLM generation params ─────────────────────────────────────────────
+    val llmMaxTokens: Int = 512,
+    val llmTemperature: Float = 0.1f,
+    val llmTopK: Int = 8,
+    val llmTopP: Float = 0.95f,
+    val llmSystemPrompt: String = "Bạn là trợ lý ảo trả lời ngắn gọn tất cả câu hỏi."
+)
+
+enum class SttType {
+    ANDROID,        // Android SpeechRecognizer SDK — no extra models needed
+    SHERPA_ONNX     // Sherpa-ONNX offline ASR — requires ONNX models in assets
+}
+
+enum class LlmType {
+    LITE_RT,        // Google LiteRT (.litertlm) — requires model on device storage
+    GEMINI_API,     // Google Gemini REST API — requires internet + API key
+    EXECUTORCH,     // PyTorch ExecuTorch (.pte) — requires ExecuTorch runtime
+    NATIVE_CPP      // llama.cpp JNI (.gguf) — requires libai_core.so + model
+}
+
+enum class TtsType {
+    ANDROID         // Android TextToSpeech SDK — no extra models needed
+}
+
+enum class RagType {
+    FASTTEXT,       // FastText word embeddings — requires .vec asset
+    NONE            // Disable RAG, go straight to LLM
+}

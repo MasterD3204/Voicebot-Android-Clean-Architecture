@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootChat"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <!-- Avatar Bot -->
+    <ImageView
+        android:id="@+id/ivBotAvatar"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="bottom"
+        android:layout_marginEnd="8dp"
+        android:src="@android:drawable/ic_menu_help"
+        android:tint="#FFFFFF"
+        android:background="@drawable/bg_metrics"
+        android:padding="4dp"/>
+
+    <!-- Khung chữ -->
+    <LinearLayout
+        android:id="@+id/chatBubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#D1D5DB"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvContent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textIsSelectable="true"/> <!-- Cho phép copy text -->
+    </LinearLayout>
+
+    <Space
+        android:id="@+id/spacer"
+        android:layout_width="48dp"
+        android:layout_height="wrap_content" />
+</LinearLayout>

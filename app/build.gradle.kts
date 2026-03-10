@@ -1,16 +1,16 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-    alias(libs.plugins.compose.compiler)
+    //alias(libs.plugins.compose.compiler)
 }
 
 android {
-    namespace = "com.k2fsa.sherpa.onnx.simulate.streaming.asr"
+    namespace = "com.voicebot"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.k2fsa.sherpa.onnx.simulate.streaming.asr.v3"
-        minSdk = 26
+        applicationId = "com.voicebot"
+        minSdk = 31
         targetSdk = 34
         ndkVersion = "26.1.10909125"
         versionCode = 20251217
@@ -43,17 +43,10 @@ android {
         jvmTarget = "17"
     }
     buildFeatures {
-        compose = true
+        //compose = true
+        viewBinding = true
     }
-    composeOptions {
-        //kotlinCompilerExtensionVersion = "1.5.1"
-    }
-    externalNativeBuild {
-        cmake {
-            path("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -64,36 +57,33 @@ android {
         pickFirst("lib/armeabi-v7a/libonnxruntime.so")
         pickFirst("lib/arm64-v8a/libonnxruntime.so")
     }
-    aaptOptions {
-        noCompress += "gguf"
-    }
-    
+
 }
 
 dependencies {
+    // Core Android
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.navigation.compose)
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    // Lifecycle
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
 
-    // Thêm Google AI SDK cho Android (Gemini)
+    // Google AI SDK (Gemini)
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
-    //implementation("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
+    // ONNX Runtime
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.1")
+
+    // Gson
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // LiteRT LLM
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha02")
 }
