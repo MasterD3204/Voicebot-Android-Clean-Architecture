@@ -71,25 +71,58 @@ class VoiceBotOrchestrator(
 
         logToUI("System: Đang khởi tạo...", false)
 
-        if (config.ragType != RagType.NONE) {
-            Log.e("DEBUG_CRASH", "4. Orchestrator: Chuẩn bị load RAG") // THÊM
-            try {
+        // --- RAG ---
+        when (config.ragType) {
+            RagType.FASTTEXT -> {
                 ragEngine.initialize(config.qaAssetFile, config.vectorAssetFile)
-                Log.e("DEBUG_CRASH", "5. Orchestrator: Load RAG thành công") // THÊM
-            } catch (e: Exception) {
-                logToUI("⚠️ Không tải được QA database.", false)
+            }
+            RagType.EMBEDDING -> {
+                // EmbeddingRagEngine không cần vectorFile (model tự tạo embeddings)
+                // QA file dùng format <chunk_splitter> giống sample của Google
+                ragEngine.initialize(
+                    qaFile = "qa_database.txt",
+                    vectorFile = ""  // không sử dụng
+                )
             }
         }
 
-        Log.e("DEBUG_CRASH", "6. Orchestrator: Chuẩn bị load LLM") // THÊM
-        val ok = llmEngine.init()
-        Log.e("DEBUG_CRASH", "7. Orchestrator: Load LLM xong, kết quả: $ok") // THÊM
-        logToUI(
-            if (ok) "✅ Bot sẵn sàng (${config.llmType.name})!"
-            else "❌ Lỗi: Không khởi tạo được LLM — kiểm tra model path.",
-            false
+        // --- LLM ---
+        Log.e("DEBUG_CRASH", "6. Orchestrator: Chuẩn bị load LLM type=${config.llmType}")
+        Log.e("DEBUG_CRASH", "6a. LLM Config dump: " +
+                "liteRtModel=${config.liteRtModelName}, " +
+                "execuTorchModel=${config.execuTorchModelName}, " +
+                "nativeModel=${config.nativeLlmModelName}, " +
+                "geminiKey=${if (config.geminiApiKey.isNotBlank()) "SET" else "EMPTY"}"
         )
+
+        try {
+            val ok = llmEngine.init()
+            Log.e("DEBUG_CRASH", "7. Orchestrator: Load LLM xong, kết quả=$ok")
+
+            if (ok) {
+                logToUI("✅ Bot sẵn sàng ( ${config.llmType.name})!", false)
+            } else {
+                Log.e("DEBUG_CRASH", "7a. LLM init() trả về FALSE - engine class: ${llmEngine::class.simpleName}")
+                logToUI(
+                    "❌ Lỗi: LLM init() trả về false\n" +
+                            "   Engine: ${llmEngine::class.simpleName}\n" +
+                            "   Type: ${config.llmType.name}\n" +
+                            "   → Kiểm tra model path hoặc file model trong assets.",
+                    false
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("DEBUG_CRASH", "7b. LLM init() CRASH với exception", e)
+            logToUI(
+                "❌ LLM init() exception:\n" +
+                        "   Engine: ${llmEngine::class.simpleName}\n" +
+                        "   Error: ${e::class.simpleName}: ${e.message}\n" +
+                        "   Cause: ${e.cause?.message ?: "none"}",
+                false
+            )
+        }
     }
+
 
     // ── Main entry point ──────────────────────────────────────────────────
 

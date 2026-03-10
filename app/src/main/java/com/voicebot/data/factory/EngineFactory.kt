@@ -70,11 +70,14 @@ object EngineFactory {
     fun createTtsEngine(context: Context, config: BotConfig): TtsEngine =
         AndroidTtsEngine(context, config.language)
 
-    fun createRagEngine(context: Context, config: BotConfig): RagEngine =
-        when (config.ragType) {
-            RagType.FASTTEXT -> FastTextRagEngine(context)
+    fun createRagEngine(context: Context, ragType: RagType): RagEngine {
+        return when (ragType) {
             RagType.NONE -> NoOpRagEngine()
+            RagType.FASTTEXT -> FastTextRagEngine(context)
+            RagType.EMBEDDING -> EmbeddingRagEngine(context)  
         }
+    }
+
 
     fun createTextNormalizer(context: Context): TextNormalizer =
         CompositeTextNormalizer(listOf(
