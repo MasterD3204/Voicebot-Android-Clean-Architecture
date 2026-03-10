@@ -18,7 +18,8 @@ data class BotConfig(
 
     // ── LLM credentials / model names ────────────────────────────────────
     val geminiApiKey: String = "",
-    val liteRtModelName: String = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+    //val liteRtModelName: String = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+    val liteRtModelName: String = "qwen3-5-2b_q8_ekv128.litertlm",
     val execuTorchModelName: String = "model.pte",
     val nativeLlmModelName: String = "model.gguf",
 

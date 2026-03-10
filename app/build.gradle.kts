@@ -85,5 +85,6 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 
     // LiteRT LLM
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha02")
+    //implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha02")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha06")
 }
