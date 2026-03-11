@@ -6,6 +6,7 @@ import com.voicebot.data.factory.EngineFactory
 import com.voicebot.domain.model.BotConfig
 import com.voicebot.domain.model.PerfMetrics
 import com.voicebot.domain.model.RagType
+import com.voicebot.domain.model.TtsType
 import com.voicebot.domain.port.LlmEngine
 import com.voicebot.domain.port.RagEngine
 import com.voicebot.domain.port.SttEngine
@@ -16,7 +17,7 @@ import com.voicebot.domain.usecase.QueryResult
 import com.voicebot.domain.usecase.VoiceQueryUseCase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
-
+import com.voicebot.data.tts.piper.PiperTtsEngine
 /**
  * Orchestrates the STT → RAG/LLM → TTS pipeline.
  *
@@ -38,8 +39,20 @@ class VoiceBotOrchestrator(
     // ── Engines (via factory, easily swappable) ───────────────────────────
     val sttEngine: SttEngine = EngineFactory.createSttEngine(context, config)
     private val llmEngine: LlmEngine = EngineFactory.createLlmEngine(context, config)
-    private val ttsEngine: TtsEngine = EngineFactory.createTtsEngine(context, config)
-    private val ragEngine: RagEngine = EngineFactory.createRagEngine(context, config)
+    private val ttsEngine: TtsEngine
+    init {
+        Log.e("DEBUG_CRASH", "INIT-3: Trước createTtsEngine (type=${config.ttsType})")
+        Log.e("DEBUG_CRASH", "INIT-3a: PiperTtsEngine class sắp được load bởi JVM...")
+        try {
+            ttsEngine = EngineFactory.createTtsEngine(context, config)
+            Log.e("DEBUG_CRASH", "INIT-3: ✅ createTtsEngine OK")
+        } catch (e: Throwable) {
+            Log.e("DEBUG_CRASH", "INIT-3: ❌ createTtsEngine FAILED: ${e::class.simpleName}: ${e.message}", e)
+            throw e
+        }
+    }
+
+    private val ragEngine: RagEngine = EngineFactory.createRagEngine(context, config.ragType)
     private val textNormalizer: TextNormalizer = EngineFactory.createTextNormalizer(context)
 
     // ── Use case ──────────────────────────────────────────────────────────
@@ -71,6 +84,16 @@ class VoiceBotOrchestrator(
 
         logToUI("System: Đang khởi tạo...", false)
 
+        if (config.ttsType == TtsType.PIPER) {
+            val ttsOk = withContext(Dispatchers.IO) {
+                (ttsEngine as? PiperTtsEngine)?.init() ?: false
+            }
+            logToUI(
+                if (ttsOk) "✅ Piper TTS sẵn sàng!"
+                else "⚠️ Piper TTS: không tìm thấy model — kiểm tra /sdcard/Download/",
+                false
+            )
+        }
         // --- RAG ---
         when (config.ragType) {
             RagType.FASTTEXT -> {
@@ -80,9 +103,13 @@ class VoiceBotOrchestrator(
                 // EmbeddingRagEngine không cần vectorFile (model tự tạo embeddings)
                 // QA file dùng format <chunk_splitter> giống sample của Google
                 ragEngine.initialize(
-                    qaFile = "qa_database.txt",
+                    qaFile = "gemma_database.txt",
                     vectorFile = ""  // không sử dụng
                 )
+            }
+            RagType.NONE -> {
+                // Không sử dụng RAG, bỏ qua khởi tạo
+                Log.i(TAG, "RAG disabled (NONE), skipping initialization")
             }
         }
 

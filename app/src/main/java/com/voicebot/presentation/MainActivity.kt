@@ -17,6 +17,7 @@ import com.voicebot.domain.model.BotConfig
 import com.voicebot.domain.model.LlmType
 import com.voicebot.domain.model.RagType
 import com.voicebot.domain.model.SttType
+import com.voicebot.domain.model.TtsType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -75,10 +76,11 @@ class MainActivity : AppCompatActivity() {
      */
     private fun buildBotConfig() = BotConfig(
         sttType = SttType.ANDROID,          // ← swap to SttType.SHERPA_ONNX for offline
-        llmType = LlmType.EXECUTORCH,          // ← swap to GEMINI_API, EXECUTORCH, NATIVE_CPP
-        ragType = RagType.FASTTEXT,         // ← swap to RagType.NONE to disable
+        llmType = LlmType.GEMINI_API,          // ← swap to GEMINI_API, EXECUTORCH, NATIVE_CPP, LITE_RT
+        ragType = RagType.NONE,         // ← swap to RagType.NONE to disable
+        ttsType = TtsType.PIPER,
         language = "vi-VN",
-        geminiApiKey = "",                  // fill in if llmType = GEMINI_API
+        geminiApiKey = "AIzaSyAsAEaZw4D7y2cESBVoyymdxmV2kKJOZks",                  // fill in if llmType = GEMINI_API
         llmSystemPrompt = "Bạn là trợ lý ảo của MISA. Trả lời ngắn gọn bằng tiếng Việt."
     )
 

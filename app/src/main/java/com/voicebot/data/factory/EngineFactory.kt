@@ -9,19 +9,22 @@ import com.voicebot.data.normalizer.CompositeTextNormalizer
 import com.voicebot.data.normalizer.NumberTextNormalizer
 import com.voicebot.data.normalizer.ProductTextNormalizer
 import com.voicebot.data.rag.fasttext.FastTextRagEngine
+import com.voicebot.data.rag.embedding.EmbedRagEngine
 import com.voicebot.data.stt.android.AndroidSttEngine
 //import com.voicebot.data.stt.sherpa.SherpaSttEngine
 import com.voicebot.data.tts.android.AndroidTtsEngine
+import com.voicebot.data.tts.piper.PiperTtsEngine
 import com.voicebot.domain.model.BotConfig
 import com.voicebot.domain.model.LlmType
 import com.voicebot.domain.model.RagType
 import com.voicebot.domain.model.SttType
+import com.voicebot.domain.model.TtsType
 import com.voicebot.domain.port.LlmEngine
 import com.voicebot.domain.port.RagEngine
 import com.voicebot.domain.port.SttEngine
 import com.voicebot.domain.port.TextNormalizer
 import com.voicebot.domain.port.TtsEngine
-
+import android.util.Log
 /**
  * ★ SINGLE PLACE to swap engine implementations.
  *
@@ -67,14 +70,39 @@ object EngineFactory {
             )
         }
 
+/*    fun createTtsEngine(context: Context, config: BotConfig): TtsEngine =
+        when (config.ttsType) {
+            TtsType.ANDROID -> AndroidTtsEngine(context, config.language)
+            TtsType.PIPER   -> PiperTtsEngine(
+                context       = context,
+                modelName     = config.piperModelName,
+                tokensName    = config.piperTokensName,
+                espDataDir    = config.piperEspDataDir,
+                speakerId     = config.piperSpeakerId,
+                speed         = config.piperSpeed,
+                numThreads    = config.piperNumThreads
+            )
+        }*/
     fun createTtsEngine(context: Context, config: BotConfig): TtsEngine =
-        AndroidTtsEngine(context, config.language)
+        when (config.ttsType) {
+            TtsType.ANDROID -> AndroidTtsEngine(context, config.language)
+            TtsType.PIPER -> PiperTtsEngine(
+                context    = context,
+                modelDir   = config.piperModelDir,        // ← THÊM
+                modelName  = config.piperModelName,
+                tokensName = config.piperTokensName,
+                espDataDir = config.piperEspDataDir,
+                speakerId  = config.piperSpeakerId,
+                speed      = config.piperSpeed,
+                numThreads = config.piperNumThreads
+            )
+        }
 
     fun createRagEngine(context: Context, ragType: RagType): RagEngine {
         return when (ragType) {
             RagType.NONE -> NoOpRagEngine()
             RagType.FASTTEXT -> FastTextRagEngine(context)
-            RagType.EMBEDDING -> EmbeddingRagEngine(context)  
+            RagType.EMBEDDING -> EmbedRagEngine(context)
         }
     }
 

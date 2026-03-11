@@ -87,9 +87,58 @@ class ExecuTorchLlmEngine(
 
         val prompt = buildChatPrompt(query)
 
+        // Buffer để phát hiện khi nào phần prompt kết thúc
+        val buffer = StringBuilder()
+        val assistantTag = "<|im_start|>assistant\n"
+        var promptEnded = false
+        // Một số model trả lại toàn bộ prompt, một số chỉ trả phần assistant.
+        // Ta dùng flag để xử lý cả 2 trường hợp.
+        var totalReceived = 0
+
         llmModule?.generate(prompt, maxTokens, object : LlmCallback {
             override fun onResult(result: String) {
-                trySend(result)
+                if (promptEnded) {
+                    // Đã qua phần prompt -> emit token trả lời
+                    // Lọc bỏ end-of-turn tokens
+                    val cleaned = result
+                        .replace("<|im_end|>", "")
+                        .replace("<|endoftext|>", "")
+                    if (cleaned.isNotEmpty()) {
+                        trySend(cleaned)
+                    }
+                    return
+                }
+
+                // Đang trong giai đoạn buffer để detect prompt
+                buffer.append(result)
+                totalReceived += result.length
+
+                // Kiểm tra xem buffer đã chứa assistant tag chưa
+                val tagIndex = buffer.indexOf(assistantTag)
+                if (tagIndex != -1) {
+                    promptEnded = true
+                    // Lấy phần text SAU assistant tag (nếu có)
+                    val afterTag = buffer.substring(tagIndex + assistantTag.length)
+                    val cleaned = afterTag
+                        .replace("<|im_end|>", "")
+                        .replace("<|endoftext|>", "")
+                    if (cleaned.isNotEmpty()) {
+                        trySend(cleaned)
+                    }
+                }
+
+                // Fallback: nếu model KHÔNG echo lại prompt
+                // (tức là token đầu tiên đã là câu trả lời)
+                // Heuristic: nếu nhận > 5 tokens mà không thấy tag -> model không echo prompt
+                if (!promptEnded && totalReceived > 200 && !buffer.contains("<|im_start|>")) {
+                    promptEnded = true
+                    val cleaned = buffer.toString()
+                        .replace("<|im_end|>", "")
+                        .replace("<|endoftext|>", "")
+                    if (cleaned.isNotEmpty()) {
+                        trySend(cleaned)
+                    }
+                }
             }
 
             override fun onStats(stats: String) {
@@ -97,14 +146,13 @@ class ExecuTorchLlmEngine(
             }
         })
 
-        // Generation hoàn tất khi generate() return
         close()
 
         awaitClose {
-            // Cleanup nếu cần khi Flow bị cancel
             Log.d(TAG, "chatStream flow closed")
         }
     }
+
 
     /**
      * Llama-style chat template.

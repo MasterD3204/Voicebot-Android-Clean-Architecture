@@ -53,9 +53,15 @@ android {
         }
         jniLibs {
             useLegacyPackaging = true
+            pickFirsts += setOf(
+                "lib/x86/libonnxruntime.so",
+                "lib/x86_64/libonnxruntime.so",
+                "lib/armeabi-v7a/libonnxruntime.so",
+                "lib/arm64-v8a/libonnxruntime.so"
+            )
         }
-        pickFirst("lib/armeabi-v7a/libonnxruntime.so")
-        pickFirst("lib/arm64-v8a/libonnxruntime.so")
+/*        pickFirst("lib/armeabi-v7a/libonnxruntime.so")
+        pickFirst("lib/arm64-v8a/libonnxruntime.so")*/
     }
 
 }
@@ -78,20 +84,33 @@ dependencies {
     // Google AI SDK (Gemini)
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
-    // ONNX Runtime
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.1")
-
     // Gson
     implementation("com.google.code.gson:gson:2.10.1")
 
     // LiteRT LLM
-    //implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha02")
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha06")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha06") {
+        exclude(group = "com.microsoft.onnxruntime")
+    }
 
     // ExecuTorch Android - dùng version mới nhất
-    implementation("org.pytorch:executorch-android:1.1.0")
+    implementation("org.pytorch:executorch-android:1.1.0") {
+        exclude(group = "com.microsoft.onnxruntime")
+    }
 
     // Coroutines (bạn đã dùng Flow)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    implementation("com.google.ai.edge.localagents:localagents-rag:0.3.0"){
+        exclude(group = "com.microsoft.onnxruntime")
+    }
+    implementation("com.google.mediapipe:tasks-genai:0.10.27"){
+        exclude(group = "com.microsoft.onnxruntime")
+    }
+// Guava (cho ImmutableList, ListenableFuture)
+    implementation("com.google.guava:guava:33.3.1-android")
+
+    // Sherpa-ONNX (Piper TTS offline)
+    //implementation("com.github.k2-fsa:sherpa-onnx:v1.12.8")
+
 }

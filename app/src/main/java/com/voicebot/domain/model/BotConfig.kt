@@ -20,8 +20,8 @@ data class BotConfig(
     val geminiApiKey: String = "",
     val liteRtModelName: String = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
     //val liteRtModelName: String = "qwen3-5-2b_q8_ekv128.litertlm",
-    val execuTorchModelName: String = "model.pte",
-    val execuTorchTokenizerName: String = "tokenizer.json",
+    val execuTorchModelName: String = "qwen2.5_pte/model.pte",
+    val execuTorchTokenizerName: String = "qwen2.5_pte/tokenizer.json",
     val nativeLlmModelName: String = "model.gguf",
 
     // ── RAG assets ───────────────────────────────────────────────────────
@@ -42,7 +42,17 @@ data class BotConfig(
     val llmTemperature: Float = 0.7f,
     val llmTopK: Int = 20,
     val llmTopP: Float = 0.8f,
-    val llmSystemPrompt: String = "Bạn là trợ lý ảo trả lời ngắn gọn tất cả câu hỏi."
+    val llmSystemPrompt: String = "Bạn là trợ lý ảo trả lời ngắn gọn tất cả câu hỏi.",
+
+    // ── Piper TTS assets / config ─────────────────────────────────────────
+    val piperModelDir: String      = "vits-piper-vi-ngochuyen",
+    val piperModelName: String     = "ngochuyen.onnx",
+    val piperTokensName: String    = "tokens.txt",
+    val piperEspDataDir: String    = "vits-piper-vi-ngochuyen/espeak-ng-data",
+    val piperSpeakerId: Int        = 0,
+    val piperSpeed: Float          = 1.0f,
+    val piperNumThreads: Int       = 4
+
 )
 
 enum class SttType {
@@ -58,11 +68,12 @@ enum class LlmType {
 }
 
 enum class TtsType {
-    ANDROID         // Android TextToSpeech SDK — no extra models needed
+    ANDROID,         // Android TextToSpeech SDK — no extra models needed
+    PIPER
 }
 
 enum class RagType {
     FASTTEXT,       // FastText word embeddings — requires .vec asset
-    EMBEDDING // Su dung embedding model 
+    EMBEDDING, // Su dung embedding model
     NONE            // Disable RAG, go straight to LLM
 }
