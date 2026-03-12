@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#111827"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚙️ Cấu hình hệ thống"
+            android:textColor="#F9FAFB"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Chọn engine và model trước khi khởi động"
+            android:textColor="#9CA3AF"
+            android:textSize="14sp"
+            android:layout_marginBottom="28dp"/>
+
+        <!-- ══ LLM ══════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🤖  Large Language Model (LLM)"
+            android:textColor="#10B981"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgLlm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp">
+
+            <RadioButton android:id="@+id/rbLlmLiteRt"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="LiteRT  (.litertlm)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp" android:checked="true"/>
+            <RadioButton android:id="@+id/rbLlmGemini"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Gemini API  (cần API key + internet)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp"/>
+            <RadioButton android:id="@+id/rbLlmExecuTorch"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="ExecuTorch  (.pte, mỗi model 1 subfolder)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp"/>
+            <RadioButton android:id="@+id/rbLlmNative"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Native C++  (.gguf)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp"/>
+        </RadioGroup>
+
+        <!-- Gemini API key — ẩn/hiện theo lựa chọn -->
+        <LinearLayout
+            android:id="@+id/layoutGeminiKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="API Key:"
+                android:textColor="#9CA3AF"
+                android:textSize="13sp"
+                android:layout_marginBottom="6dp"/>
+
+            <EditText
+                android:id="@+id/etGeminiKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nhập Gemini API Key..."
+                android:textColorHint="#6B7280"
+                android:textColor="#F9FAFB"
+                android:textSize="14sp"
+                android:inputType="textPassword"
+                android:padding="12dp"
+                android:background="#1F2937"/>
+        </LinearLayout>
+
+        <!-- Danh sách model — sinh động theo loại LLM -->
+        <TextView
+            android:id="@+id/tvModelLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Chọn model:"
+            android:textColor="#9CA3AF"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="6dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgModels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <TextView
+            android:id="@+id/tvNoModel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚠️  Không tìm thấy model nào trong /sdcard/Download/\nHãy copy file model vào thiết bị trước."
+            android:textColor="#F59E0B"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- Divider -->
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#1F2937" android:layout_marginTop="8dp" android:layout_marginBottom="24dp"/>
+
+        <!-- ══ STT ══════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎙️  Speech-to-Text (STT)"
+            android:textColor="#10B981"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp"/>
+
+        <RadioGroup android:id="@+id/rgStt"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp">
+            <RadioButton android:id="@+id/rbSttAndroid"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Android STT  (online, không cần cài thêm)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp" android:checked="true"/>
+            <RadioButton android:id="@+id/rbSttSherpa"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Sherpa-ONNX  (offline, cần model ONNX)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp"/>
+        </RadioGroup>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#1F2937" android:layout_marginTop="8dp" android:layout_marginBottom="24dp"/>
+
+        <!-- ══ RAG ══════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔍  Retrieval-Augmented Generation (RAG)"
+            android:textColor="#10B981"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp"/>
+
+        <RadioGroup android:id="@+id/rgRag"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp">
+            <RadioButton android:id="@+id/rbRagNone"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Tắt RAG  (chỉ dùng LLM thuần)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp"/>
+            <RadioButton android:id="@+id/rbRagFasttext"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="FastText  (BM25 + Cosine)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp" android:checked="true"/>
+            <RadioButton android:id="@+id/rbRagEmbedding"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Embedding  (Dense retrieval)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp"/>
+        </RadioGroup>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#1F2937" android:layout_marginTop="8dp" android:layout_marginBottom="24dp"/>
+
+        <!-- ══ TTS ══════════════════════════════════════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔊  Text-to-Speech (TTS)"
+            android:textColor="#10B981"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="10dp"/>
+
+        <RadioGroup android:id="@+id/rgTts"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="36dp">
+            <RadioButton android:id="@+id/rbTtsAndroid"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Android TTS  (có sẵn trên thiết bị)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp" android:checked="true"/>
+            <RadioButton android:id="@+id/rbTtsPiper"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Piper TTS  (offline, cần ngochuyen.onnx)" android:textColor="#E5E7EB"
+                android:buttonTint="#10B981" android:paddingStart="8dp"/>
+        </RadioGroup>
+
+        <!-- Khởi động -->
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="🚀  Khởi động"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#3B82F6"/>
+
+    </LinearLayout>
+</ScrollView>

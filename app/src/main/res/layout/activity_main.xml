@@ -71,6 +71,18 @@
         app:layout_constraintBottom_toBottomOf="parent">
 
         <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚙️"
+            android:textSize="18sp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            app:backgroundTint="#374151"/>
+
+        <Space android:layout_width="10dp" android:layout_height="wrap_content"/>
+
+        <Button
             android:id="@+id/btnToggleMic"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -78,9 +90,7 @@
             android:enabled="false"
             app:backgroundTint="#3B82F6"/>
 
-        <Space
-            android:layout_width="16dp"
-            android:layout_height="wrap_content" />
+        <Space android:layout_width="10dp" android:layout_height="wrap_content"/>
 
         <Button
             android:id="@+id/btnClear"

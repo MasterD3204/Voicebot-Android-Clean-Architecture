@@ -71,8 +71,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-
+    //implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.constraintlayout:constraintlayout:2.2.0")
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
@@ -112,5 +112,4 @@ dependencies {
 
     // Sherpa-ONNX (Piper TTS offline)
     //implementation("com.github.k2-fsa:sherpa-onnx:v1.12.8")
-
 }

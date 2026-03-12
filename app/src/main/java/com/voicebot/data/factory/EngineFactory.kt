@@ -55,11 +55,12 @@ object EngineFactory {
                 systemInstruction = config.llmSystemPrompt
             )
             LlmType.EXECUTORCH -> ExecuTorchLlmEngine(
-                context = context,
-                modelName = config.execuTorchModelName,
-                tokenizerName = config.execuTorchTokenizerName,
-                systemPrompt = config.llmSystemPrompt,
-                maxTokens = config.llmMaxTokens
+                context           = context,
+                folderName        = config.execuTorchFolderName,
+                modelFileName     = config.execuTorchModelFileName,
+                tokenizerFileName = config.execuTorchTokenizerFileName,
+                systemPrompt      = config.llmSystemPrompt,
+                maxTokens         = config.llmMaxTokens
             )
             LlmType.NATIVE_CPP -> NativeLlmEngine(
                 modelPath = config.nativeLlmModelName,
@@ -107,6 +108,33 @@ object EngineFactory {
     }
 
 
+    /**
+     * Tìm file trong /sdcard/Download/ và các path phổ biến.
+     * Dùng cho LiteRT, NativeCpp, Piper, v.v.
+     */
+    fun findDownloadFile(context: Context, fileName: String): String? {
+        val ext = context.getExternalFilesDir(null)?.absolutePath ?: ""
+        return listOf(
+            "/sdcard/Download/$fileName",
+            "/storage/emulated/0/Download/$fileName",
+            "/sdcard/$fileName",
+            "$ext/$fileName"
+        ).firstOrNull { java.io.File(it).exists() }
+    }
+
+    /**
+     * ExecuTorch: mỗi model nằm trong folder riêng có tên là [folderName].
+     * /sdcard/Download/<folderName>/model.pte
+     * /sdcard/Download/<folderName>/tokenizer.bin  (hoặc tokenizer.model)
+     */
+    fun findExecuTorchFile(context: Context, folderName: String, fileName: String): String? {
+        val ext = context.getExternalFilesDir(null)?.absolutePath ?: ""
+        return listOf(
+            "/sdcard/Download/$folderName/$fileName",
+            "/storage/emulated/0/Download/$folderName/$fileName",
+            "$ext/$folderName/$fileName"
+        ).firstOrNull { java.io.File(it).exists() }
+    }
     fun createTextNormalizer(context: Context): TextNormalizer =
         CompositeTextNormalizer(listOf(
             NumberTextNormalizer(),

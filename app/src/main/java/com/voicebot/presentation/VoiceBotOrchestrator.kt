@@ -117,7 +117,7 @@ class VoiceBotOrchestrator(
         Log.e("DEBUG_CRASH", "6. Orchestrator: Chuẩn bị load LLM type=${config.llmType}")
         Log.e("DEBUG_CRASH", "6a. LLM Config dump: " +
                 "liteRtModel=${config.liteRtModelName}, " +
-                "execuTorchModel=${config.execuTorchModelName}, " +
+                "execuTorchModel=${config.execuTorchFolderName}, " +
                 "nativeModel=${config.nativeLlmModelName}, " +
                 "geminiKey=${if (config.geminiApiKey.isNotBlank()) "SET" else "EMPTY"}"
         )

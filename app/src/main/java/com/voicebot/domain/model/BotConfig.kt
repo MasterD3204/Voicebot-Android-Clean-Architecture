@@ -17,11 +17,12 @@ data class BotConfig(
     val language: String = "vi-VN",
 
     // ── LLM credentials / model names ────────────────────────────────────
-    val geminiApiKey: String = "",
+    val geminiApiKey: String = "AIzaSyAsAEaZw4D7y2cESBVoyymdxmV2kKJOZks",
     val liteRtModelName: String = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
     //val liteRtModelName: String = "qwen3-5-2b_q8_ekv128.litertlm",
-    val execuTorchModelName: String = "qwen2.5_pte/model.pte",
-    val execuTorchTokenizerName: String = "qwen2.5_pte/tokenizer.json",
+    val execuTorchFolderName: String        = "qwen2.5_pte",
+    val execuTorchModelFileName: String     = "model.pte",
+    val execuTorchTokenizerFileName: String = "tokenizer.json",
     val nativeLlmModelName: String = "model.gguf",
 
     // ── RAG assets ───────────────────────────────────────────────────────

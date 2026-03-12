@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.flowOn
  */
 class GeminiLlmEngine(
     private val apiKey: String,
-    private val modelName: String = "gemini-2.5-flash",
+    private val modelName: String = "gemini-2.5-flash-lite",
     private val systemInstruction: String = "Bạn là trợ lý ảo hữu ích. Trả lời ngắn gọn bằng tiếng Việt."
 ) : LlmEngine {
 

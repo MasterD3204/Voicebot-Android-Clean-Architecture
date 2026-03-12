@@ -27,8 +27,9 @@
             android:name="libcdsprpc.so"
             android:required="false"/>
 
+        <!-- SetupActivity: launcher — hiện trước khi load bất kỳ model nào -->
         <activity
-            android:name="com.voicebot.presentation.MainActivity"
+            android:name="com.voicebot.presentation.SetupActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.SimulateStreamingAsr">
@@ -38,10 +39,15 @@
             </intent-filter>
         </activity>
 
+        <!-- MainActivity: màn hình chat chính -->
+        <activity
+            android:name="com.voicebot.presentation.MainActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.SimulateStreamingAsr" />
+
         <uses-native-library android:name="libvndksupport.so" android:required="false"/>
         <uses-native-library android:name="libOpenCL.so" android:required="false"/>
-        <uses-native-library android:name="libOpenCL-car.so" android:required="false"/>
-        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false"/>
     </application>
 
 </manifest>
