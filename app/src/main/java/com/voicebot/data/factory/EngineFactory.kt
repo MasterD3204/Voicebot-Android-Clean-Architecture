@@ -24,6 +24,7 @@ import com.voicebot.domain.port.RagEngine
 import com.voicebot.domain.port.SttEngine
 import com.voicebot.domain.port.TextNormalizer
 import com.voicebot.domain.port.TtsEngine
+import com.voicebot.data.llm.ragonly.RagOnlyLlmEngine
 import android.util.Log
 /**
  * ★ SINGLE PLACE to swap engine implementations.
@@ -69,21 +70,12 @@ object EngineFactory {
                 topK = config.llmTopK,
                 topP = config.llmTopP
             )
-        }
-
-/*    fun createTtsEngine(context: Context, config: BotConfig): TtsEngine =
-        when (config.ttsType) {
-            TtsType.ANDROID -> AndroidTtsEngine(context, config.language)
-            TtsType.PIPER   -> PiperTtsEngine(
-                context       = context,
-                modelName     = config.piperModelName,
-                tokensName    = config.piperTokensName,
-                espDataDir    = config.piperEspDataDir,
-                speakerId     = config.piperSpeakerId,
-                speed         = config.piperSpeed,
-                numThreads    = config.piperNumThreads
+            LlmType.RAG_ONLY -> RagOnlyLlmEngine(
+                context    = context,
+                qaFile     = config.qaAssetFile,
+                //vectorFile = config.vectorAssetFile
             )
-        }*/
+        }
     fun createTtsEngine(context: Context, config: BotConfig): TtsEngine =
         when (config.ttsType) {
             TtsType.ANDROID -> AndroidTtsEngine(context, config.language)

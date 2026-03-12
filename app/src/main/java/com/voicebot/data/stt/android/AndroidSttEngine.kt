@@ -44,7 +44,7 @@ class AndroidSttEngine(
         Log.i(TAG, "🔍 isRecognitionAvailable=$isAvailable, isOnDeviceAvailable=$isOnDeviceAvailable")
 
         // ✅ On-device chỉ hỗ trợ tiếng Anh — dùng cloud-based cho vi-VN
-        val useOnDevice = isOnDeviceAvailable && language.startsWith("en")
+        val useOnDevice = isOnDeviceAvailable && language.startsWith("vn")
         val sr = if (useOnDevice) {
             try {
                 SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also {

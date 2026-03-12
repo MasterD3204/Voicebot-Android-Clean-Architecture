@@ -39,7 +39,7 @@ data class BotConfig(
     val sherpaVadType: Int = 0,           // 0 = Silero VAD, 1 = TenVAD
 
     // ── LLM generation params ─────────────────────────────────────────────
-    val llmMaxTokens: Int = 1024,
+    val llmMaxTokens: Int = 2048,
     val llmTemperature: Float = 0.7f,
     val llmTopK: Int = 20,
     val llmTopP: Float = 0.8f,
@@ -65,7 +65,8 @@ enum class LlmType {
     LITE_RT,        // Google LiteRT (.litertlm) — requires model on device storage
     GEMINI_API,     // Google Gemini REST API — requires internet + API key
     EXECUTORCH,     // PyTorch ExecuTorch (.pte) — requires ExecuTorch runtime
-    NATIVE_CPP      // llama.cpp JNI (.gguf) — requires libai_core.so + model
+    NATIVE_CPP,    // llama.cpp JNI (.gguf) — requires libai_core.so + model
+    RAG_ONLY
 }
 
 enum class TtsType {

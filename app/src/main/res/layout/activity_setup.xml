@@ -61,6 +61,10 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="Native C++  (.gguf)" android:textColor="#E5E7EB"
                 android:buttonTint="#10B981" android:paddingStart="8dp"/>
+            <RadioButton android:id="@+id/rbLlmRagOnly"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Tắt LLM — chỉ RAG thuần  (FastText, không cần model)" android:textColor="#F59E0B"
+                android:buttonTint="#F59E0B" android:paddingStart="8dp"/>
         </RadioGroup>
 
         <!-- Gemini API key — ẩn/hiện theo lựa chọn -->
@@ -85,7 +89,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Nhập Gemini API Key..."
-                android:textColorHint="#6B7280"
+                app:hintTextColor="#6B7280"
                 android:textColor="#F9FAFB"
                 android:textSize="14sp"
                 android:inputType="textPassword"

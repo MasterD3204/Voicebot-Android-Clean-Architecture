@@ -3,9 +3,11 @@ package com.voicebot.presentation
 import android.content.Context
 import android.util.Log
 import com.voicebot.data.factory.EngineFactory
+import com.voicebot.data.tts.piper.PiperTtsEngine
 import com.voicebot.domain.model.BotConfig
 import com.voicebot.domain.model.PerfMetrics
 import com.voicebot.domain.model.RagType
+import com.voicebot.domain.model.LlmType
 import com.voicebot.domain.model.TtsType
 import com.voicebot.domain.port.LlmEngine
 import com.voicebot.domain.port.RagEngine
@@ -17,7 +19,7 @@ import com.voicebot.domain.usecase.QueryResult
 import com.voicebot.domain.usecase.VoiceQueryUseCase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
-import com.voicebot.data.tts.piper.PiperTtsEngine
+
 /**
  * Orchestrates the STT → RAG/LLM → TTS pipeline.
  *
@@ -39,24 +41,17 @@ class VoiceBotOrchestrator(
     // ── Engines (via factory, easily swappable) ───────────────────────────
     val sttEngine: SttEngine = EngineFactory.createSttEngine(context, config)
     private val llmEngine: LlmEngine = EngineFactory.createLlmEngine(context, config)
-    private val ttsEngine: TtsEngine
-    init {
-        Log.e("DEBUG_CRASH", "INIT-3: Trước createTtsEngine (type=${config.ttsType})")
-        Log.e("DEBUG_CRASH", "INIT-3a: PiperTtsEngine class sắp được load bởi JVM...")
-        try {
-            ttsEngine = EngineFactory.createTtsEngine(context, config)
-            Log.e("DEBUG_CRASH", "INIT-3: ✅ createTtsEngine OK")
-        } catch (e: Throwable) {
-            Log.e("DEBUG_CRASH", "INIT-3: ❌ createTtsEngine FAILED: ${e::class.simpleName}: ${e.message}", e)
-            throw e
-        }
-    }
-
+    private val ttsEngine: TtsEngine = EngineFactory.createTtsEngine(context, config)
     private val ragEngine: RagEngine = EngineFactory.createRagEngine(context, config.ragType)
     private val textNormalizer: TextNormalizer = EngineFactory.createTextNormalizer(context)
 
     // ── Use case ──────────────────────────────────────────────────────────
-    private val useCase = VoiceQueryUseCase(ragEngine, llmEngine, BargeInDetector())
+    private val useCase = VoiceQueryUseCase(
+        ragEngine      = ragEngine,
+        llmEngine      = llmEngine,
+        bargeInDetector = BargeInDetector(),
+        isRagOnly      = (config.llmType == com.voicebot.domain.model.LlmType.RAG_ONLY)
+    )
 
     // ── State ─────────────────────────────────────────────────────────────
     @Volatile var isBotBusy = false
@@ -84,6 +79,7 @@ class VoiceBotOrchestrator(
 
         logToUI("System: Đang khởi tạo...", false)
 
+        // Init Piper TTS nếu được chọn (cần tìm file trên storage)
         if (config.ttsType == TtsType.PIPER) {
             val ttsOk = withContext(Dispatchers.IO) {
                 (ttsEngine as? PiperTtsEngine)?.init() ?: false
@@ -94,62 +90,29 @@ class VoiceBotOrchestrator(
                 false
             )
         }
-        // --- RAG ---
-        when (config.ragType) {
-            RagType.FASTTEXT -> {
-                ragEngine.initialize(config.qaAssetFile, config.vectorAssetFile)
-            }
-            RagType.EMBEDDING -> {
-                // EmbeddingRagEngine không cần vectorFile (model tự tạo embeddings)
-                // QA file dùng format <chunk_splitter> giống sample của Google
-                ragEngine.initialize(
-                    qaFile = "gemma_database.txt",
-                    vectorFile = ""  // không sử dụng
-                )
-            }
-            RagType.NONE -> {
-                // Không sử dụng RAG, bỏ qua khởi tạo
-                Log.i(TAG, "RAG disabled (NONE), skipping initialization")
+
+        // RAG_ONLY: RagOnlyLlmEngine tự load QA+vector trong llmEngine.init() bên dưới
+        // Các mode khác: init ragEngine riêng để inject context vào LLM
+        if (config.llmType != LlmType.RAG_ONLY && config.ragType != RagType.NONE) {
+            try {
+                val qaFile     = if (config.ragType == RagType.EMBEDDING) "gemma_database.txt" else config.qaAssetFile
+                val vectorFile = if (config.ragType == RagType.EMBEDDING) "" else config.vectorAssetFile
+                ragEngine.initialize(qaFile, vectorFile)
+                Log.i(TAG, "RAG initialized (${config.ragType.name})")
+            } catch (e: Exception) {
+                logToUI("⚠️ Không tải được QA database.", false)
             }
         }
 
-        // --- LLM ---
-        Log.e("DEBUG_CRASH", "6. Orchestrator: Chuẩn bị load LLM type=${config.llmType}")
-        Log.e("DEBUG_CRASH", "6a. LLM Config dump: " +
-                "liteRtModel=${config.liteRtModelName}, " +
-                "execuTorchModel=${config.execuTorchFolderName}, " +
-                "nativeModel=${config.nativeLlmModelName}, " +
-                "geminiKey=${if (config.geminiApiKey.isNotBlank()) "SET" else "EMPTY"}"
+        Log.e("DEBUG_CRASH", "6. Orchestrator: Chuẩn bị load LLM") // THÊM
+        val ok = llmEngine.init()
+        Log.e("DEBUG_CRASH", "7. Orchestrator: Load LLM xong, kết quả: $ok") // THÊM
+        logToUI(
+            if (ok) "✅ Bot sẵn sàng (${config.llmType.name})!"
+            else "❌ Lỗi: Không khởi tạo được LLM — kiểm tra model path.",
+            false
         )
-
-        try {
-            val ok = llmEngine.init()
-            Log.e("DEBUG_CRASH", "7. Orchestrator: Load LLM xong, kết quả=$ok")
-
-            if (ok) {
-                logToUI("✅ Bot sẵn sàng ( ${config.llmType.name})!", false)
-            } else {
-                Log.e("DEBUG_CRASH", "7a. LLM init() trả về FALSE - engine class: ${llmEngine::class.simpleName}")
-                logToUI(
-                    "❌ Lỗi: LLM init() trả về false\n" +
-                            "   Engine: ${llmEngine::class.simpleName}\n" +
-                            "   Type: ${config.llmType.name}\n" +
-                            "   → Kiểm tra model path hoặc file model trong assets.",
-                    false
-                )
-            }
-        } catch (e: Exception) {
-            Log.e("DEBUG_CRASH", "7b. LLM init() CRASH với exception", e)
-            logToUI(
-                "❌ LLM init() exception:\n" +
-                        "   Engine: ${llmEngine::class.simpleName}\n" +
-                        "   Error: ${e::class.simpleName}: ${e.message}\n" +
-                        "   Cause: ${e.cause?.message ?: "none"}",
-                false
-            )
-        }
     }
-
 
     // ── Main entry point ──────────────────────────────────────────────────
 

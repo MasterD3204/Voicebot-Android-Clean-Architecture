@@ -70,17 +70,21 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun onLlmTypeChanged(checkedId: Int) {
-        // Ẩn Gemini key trước
         binding.layoutGeminiKey.visibility = View.GONE
-
         when (checkedId) {
             binding.rbLlmGemini.id -> {
                 binding.layoutGeminiKey.visibility = View.VISIBLE
                 hideModelPicker()
             }
-            binding.rbLlmLiteRt.id      -> scanAndShowModels(ext = "litertlm")
-            binding.rbLlmNative.id      -> scanAndShowModels(ext = "gguf")
-            binding.rbLlmExecuTorch.id  -> scanAndShowExecuTorchFolders()
+            binding.rbLlmRagOnly.id -> {
+                // Không cần model file — dùng assets QA + vector
+                hideModelPicker()
+                binding.tvModelLabel.visibility = View.VISIBLE
+                binding.tvModelLabel.text       = "✅ Dùng assets/qa_database.txt + vi_fasttext_pruned.vec"
+            }
+            binding.rbLlmLiteRt.id     -> scanAndShowModels(ext = "litertlm")
+            binding.rbLlmNative.id     -> scanAndShowModels(ext = "gguf")
+            binding.rbLlmExecuTorch.id -> scanAndShowExecuTorchFolders()
         }
     }
 
@@ -183,20 +187,21 @@ class SetupActivity : AppCompatActivity() {
             binding.rbLlmGemini.id      -> LlmType.GEMINI_API
             binding.rbLlmExecuTorch.id  -> LlmType.EXECUTORCH
             binding.rbLlmNative.id      -> LlmType.NATIVE_CPP
+            binding.rbLlmRagOnly.id     -> LlmType.RAG_ONLY
             else                        -> LlmType.LITE_RT
         }
 
-        // Validate: loại cần file nhưng chưa chọn
-        if (llmType != LlmType.GEMINI_API && selectedModelName.isBlank()) {
+        // RAG_ONLY không cần model file
+        if (llmType != LlmType.GEMINI_API && llmType != LlmType.RAG_ONLY && selectedModelName.isBlank()) {
             Toast.makeText(this, "Vui lòng chọn một model", Toast.LENGTH_SHORT).show()
             return
         }
 
         val geminiKey = binding.etGeminiKey.text?.toString()?.trim() ?: ""
-/*        if (llmType == LlmType.GEMINI_API && geminiKey.isBlank()) {
+        if (llmType == LlmType.GEMINI_API && geminiKey.isBlank()) {
             Toast.makeText(this, "Vui lòng nhập Gemini API Key", Toast.LENGTH_SHORT).show()
             return
-        }*/
+        }
 
         val sttType = when (binding.rgStt.checkedRadioButtonId) {
             binding.rbSttSherpa.id -> SttType.SHERPA_ONNX
