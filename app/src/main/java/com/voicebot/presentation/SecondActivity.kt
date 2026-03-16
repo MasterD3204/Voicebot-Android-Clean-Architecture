@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.util.Log
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -90,6 +91,10 @@ class SecondActivity : AppCompatActivity() {
 
     // Talk sway rotation
     private var talkSwayAnimator: ValueAnimator? = null
+
+    private var touchLastX = 0f
+    private var isTouching = false
+    private val TOUCH_ROTATION_SENSITIVITY = 0.4f
     //End model 3d
     
 
@@ -187,6 +192,36 @@ class SecondActivity : AppCompatActivity() {
             Log.i(TAG, "✅ SceneView configured with transparent background")
         } catch (e: Exception) {
             Log.e(TAG, "❌ setupSceneView error", e)
+        }
+
+        setupModelTouchRotation()
+    }
+
+    private fun setupModelTouchRotation() {
+        binding.sceneView.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    touchLastX = event.x
+                    isTouching = true
+                    talkSwayAnimator?.pause()
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (isTouching) {
+                        val dx = event.x - touchLastX
+                        touchLastX = event.x
+                        currentRotationY += dx * TOUCH_ROTATION_SENSITIVITY
+                        parentNode?.rotation = Rotation(currentRotationX, currentRotationY, currentRotationZ)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    isTouching = false
+                    if (isTalkAnimating && !isTalkPaused) talkSwayAnimator?.resume()
+                    true
+                }
+                else -> false
+            }
         }
     }
 

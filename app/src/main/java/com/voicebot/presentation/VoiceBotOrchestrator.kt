@@ -115,7 +115,7 @@ class VoiceBotOrchestrator(
         }
 
         Log.e("DEBUG_CRASH", "6. Orchestrator: Chuẩn bị load LLM") // THÊM
-        val ok = llmEngine.init()
+        val ok = withContext(Dispatchers.IO) { llmEngine.init() }
         Log.e("DEBUG_CRASH", "7. Orchestrator: Load LLM xong, kết quả: $ok") // THÊM
         logToUI(
             if (ok) "✅ Bot sẵn sàng (${config.llmType.name})!"

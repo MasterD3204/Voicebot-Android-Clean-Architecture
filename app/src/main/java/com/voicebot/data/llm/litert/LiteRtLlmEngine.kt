@@ -4,9 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.google.ai.edge.litertlm.*
 import com.voicebot.domain.port.LlmEngine
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.CancellationException
 
@@ -33,20 +35,20 @@ class LiteRtLlmEngine(
 
     override fun isReady() = initialized && conversation != null
 
-    override suspend fun init(): Boolean {
+    override suspend fun init(): Boolean = withContext(Dispatchers.IO) {
         Log.d(TAG, "===== START MODEL INITIALIZATION =====")
         Log.d(TAG, "Looking for model: '$modelName'")
 
         val path = findModelPath() ?: run {
             Log.e(TAG, "❌ Model '$modelName' not found in any search path")
-            return false
+            return@withContext false
         }
 
         Log.i(TAG, "✅ Model found at: $path")
         Log.d(TAG, "File size: ${File(path).length() / (1024 * 1024)} MB")
 
         val gpuSuccess = tryInit(path, Backend.GPU())
-        if (gpuSuccess) return true
+        if (gpuSuccess) return@withContext true
 
         Log.w(TAG, "⚠️ GPU init failed, falling back to CPU...")
         val cpuSuccess = tryInit(path, Backend.CPU())
@@ -54,7 +56,7 @@ class LiteRtLlmEngine(
         if (!cpuSuccess) {
             Log.e(TAG, "❌ Both GPU and CPU initialization failed!")
         }
-        return cpuSuccess
+        cpuSuccess
     }
 
     private fun findModelPath(): String? {
