@@ -41,7 +41,7 @@ class VoiceBotOrchestrator(
     // ── Engines (via factory, easily swappable) ───────────────────────────
     val sttEngine: SttEngine = EngineFactory.createSttEngine(context, config)
     private val llmEngine: LlmEngine = EngineFactory.createLlmEngine(context, config)
-    private val ttsEngine: TtsEngine = EngineFactory.createTtsEngine(context, config)
+    val ttsEngine: TtsEngine = EngineFactory.createTtsEngine(context, config)
     private val ragEngine: RagEngine = EngineFactory.createRagEngine(context, config.ragType)
     private val textNormalizer: TextNormalizer = EngineFactory.createTextNormalizer(context)
 
@@ -66,10 +66,20 @@ class VoiceBotOrchestrator(
     var onLog: ((message: String, isUpdate: Boolean) -> Unit)? = null
     var onMetricsUpdate: ((PerfMetrics) -> Unit)? = null
     var onBotBusyChanged: ((Boolean) -> Unit)? = null
+    var onAllSpeechComplete: (() -> Unit)? = null
+    var onTtsStartWithLength: ((isLong: Boolean) -> Unit)? = null
+
+    private var isTtsQueueComplete = false
 
     init {
         ttsEngine.onSpeechStart = { setBotBusy(true) }
-        ttsEngine.onSpeechDone = { if (!ttsEngine.isSpeaking()) setBotBusy(false) }
+        ttsEngine.onAllSpeechDone = {
+            if (isTtsQueueComplete) {
+                isTtsQueueComplete = false
+                setBotBusy(false)
+                CoroutineScope(Dispatchers.Main).launch { onAllSpeechComplete?.invoke() }
+            }
+        }
     }
 
     // ── Initialisation ────────────────────────────────────────────────────
@@ -136,6 +146,7 @@ class VoiceBotOrchestrator(
                         notifyMetrics()
                         streamWords(result.response)
                         speakText(result.response, 0)
+                        finalizeTtsQueue()
                     }
                     is QueryResult.LlmStream -> {
                         currentMetrics.queryEndTime = System.currentTimeMillis()
@@ -167,7 +178,6 @@ class VoiceBotOrchestrator(
         }
     }
 
-    /** Consume a streaming Flow, accumulate text and feed TTS sentence-by-sentence */
     private suspend fun consumeStream(flow: Flow<String>) {
         val fullText = StringBuilder()
         val sentenceBuf = StringBuilder()
@@ -184,7 +194,6 @@ class VoiceBotOrchestrator(
             logToUI("Bot: $fullText", true)
             sentenceBuf.append(chunk)
 
-            // Flush complete sentences to TTS as they arrive
             while (hasSentenceEnd(sentenceBuf.toString())) {
                 val (sentence, rest) = cutSentence(sentenceBuf.toString())
                 if (sentence.isNotBlank()) speakText(sentence, sentenceCount++)
@@ -192,8 +201,13 @@ class VoiceBotOrchestrator(
             }
         }
 
-        // Flush remainder
         if (sentenceBuf.isNotBlank()) speakText(sentenceBuf.toString(), sentenceCount++)
+        finalizeTtsQueue()
+    }
+
+    private fun finalizeTtsQueue() {
+        isTtsQueueComplete = true
+        ttsEngine.markQueueComplete()
     }
 
     private fun hasSentenceEnd(text: String) =
@@ -209,6 +223,10 @@ class VoiceBotOrchestrator(
         if (id == 0) {
             currentMetrics.ttsFirstAudioTime = System.currentTimeMillis()
             notifyMetrics()
+        }
+        val isLong = text.trim().split(Regex("\\s+")).count { it.isNotBlank() } >= 8
+        CoroutineScope(Dispatchers.Main).launch {
+            onTtsStartWithLength?.invoke(isLong)
         }
         ttsEngine.speak(textNormalizer.normalize(text), "utt_$id")
     }
@@ -232,9 +250,10 @@ class VoiceBotOrchestrator(
         processJob?.cancel(); processJob = null
         ttsEngine.stop()
         isBotBusy = false
+        isTtsQueueComplete = false
         currentMetrics = PerfMetrics()
         notifyMetrics()
-        useCase.resetHistory()          // xóa ngữ cảnh hội thoại khi user clear chat
+        useCase.resetHistory()
         Log.i(TAG, "Bot state reset")
     }
 

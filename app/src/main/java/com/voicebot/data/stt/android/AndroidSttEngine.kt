@@ -81,7 +81,7 @@ class AndroidSttEngine(
                     val duration = if (lastStartTime > 0) System.currentTimeMillis() - lastStartTime else -1
                     Log.i(TAG, "🔴 onEndOfSpeech (duration=${duration}ms)")
                     isCurrentlyListening = false
-                    onListeningStopped?.invoke()
+                    // onListeningStopped fired by onResults / onError — NOT here
                 }
 
                 override fun onPartialResults(partial: Bundle?) {

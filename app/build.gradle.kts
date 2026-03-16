@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.voicebot"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.voicebot"
         minSdk = 31
-        targetSdk = 34
+        targetSdk = 35
         ndkVersion = "26.1.10909125"
         versionCode = 20251217
         versionName = "1.12.20"
@@ -112,4 +112,6 @@ dependencies {
 
     // Sherpa-ONNX (Piper TTS offline)
     //implementation("com.github.k2-fsa:sherpa-onnx:v1.12.8")
+
+    implementation("io.github.sceneview:sceneview:2.3.3")
 }

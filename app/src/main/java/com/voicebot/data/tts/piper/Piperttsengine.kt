@@ -40,6 +40,7 @@ class PiperTtsEngine(
 
     override var onSpeechStart: (() -> Unit)? = null
     override var onSpeechDone: (() -> Unit)? = null
+    override var onAllSpeechDone: (() -> Unit)? = null
 
     private var tts: OfflineTts? = null
 
@@ -198,6 +199,8 @@ class PiperTtsEngine(
         }
         onSpeechDone?.invoke()
     }
+
+    override fun markQueueComplete() { }
 
     override fun isSpeaking(): Boolean = isSpeakingFlag.get()
 

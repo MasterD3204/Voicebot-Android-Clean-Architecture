@@ -6,11 +6,8 @@ import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.voicebot.domain.port.TtsEngine
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * TTS engine backed by Android's built-in TextToSpeech API.
- * Sentences are queued (QUEUE_ADD) for smooth sequential playback.
- */
 class AndroidTtsEngine(
     context: Context,
     private val language: String = "vi-VN"
@@ -20,9 +17,15 @@ class AndroidTtsEngine(
 
     override var onSpeechStart: (() -> Unit)? = null
     override var onSpeechDone: (() -> Unit)? = null
+    override var onAllSpeechDone: (() -> Unit)? = null
 
     private var tts: TextToSpeech? = null
     private var initialized = false
+
+    private val lock = Any()
+    private val queuedCount = AtomicInteger(0)
+    private val doneCount   = AtomicInteger(0)
+    private var queueMarkedComplete = false
 
     init {
         tts = TextToSpeech(context) { status ->
@@ -38,21 +41,47 @@ class AndroidTtsEngine(
             }
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(id: String?) { onSpeechStart?.invoke() }
-                override fun onDone(id: String?) { onSpeechDone?.invoke() }
+                override fun onDone(id: String?) {
+                    onSpeechDone?.invoke()
+                    notifyDone()
+                }
                 @Deprecated("Deprecated in API 21")
-                override fun onError(id: String?) { onSpeechDone?.invoke() }
+                override fun onError(id: String?) {
+                    onSpeechDone?.invoke()
+                    notifyDone()
+                }
             })
             initialized = true
             Log.i(TAG, "Android TTS initialized for '$language'")
         }
     }
 
+    private fun notifyDone() {
+        val shouldFire = synchronized(lock) {
+            val done = doneCount.incrementAndGet()
+            queueMarkedComplete && done >= queuedCount.get()
+        }
+        if (shouldFire) onAllSpeechDone?.invoke()
+    }
+
     override fun speak(text: String, utteranceId: String) {
         if (!initialized) { Log.w(TAG, "speak() called before init"); return }
+        queuedCount.incrementAndGet()
         tts?.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
     }
 
-    override fun stop() { tts?.stop() }
+    override fun markQueueComplete() {
+        val shouldFire = synchronized(lock) {
+            queueMarkedComplete = true
+            doneCount.get() >= queuedCount.get()
+        }
+        if (shouldFire) onAllSpeechDone?.invoke()
+    }
+
+    override fun stop() {
+        tts?.stop()
+        resetCounters()
+    }
 
     override fun isSpeaking() = tts?.isSpeaking ?: false
 
@@ -60,5 +89,14 @@ class AndroidTtsEngine(
         tts?.shutdown()
         tts = null
         initialized = false
+        resetCounters()
+    }
+
+    private fun resetCounters() {
+        synchronized(lock) {
+            queuedCount.set(0)
+            doneCount.set(0)
+            queueMarkedComplete = false
+        }
     }
 }

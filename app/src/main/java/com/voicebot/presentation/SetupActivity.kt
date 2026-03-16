@@ -218,7 +218,7 @@ class SetupActivity : AppCompatActivity() {
         }
 
         startActivity(
-            Intent(this, MainActivity::class.java).apply {
+            Intent(this, SecondActivity::class.java).apply {
                 putExtra(EXTRA_LLM_TYPE,       llmType.name)
                 putExtra(EXTRA_LLM_MODEL_NAME, selectedModelName)
                 putExtra(EXTRA_GEMINI_KEY,     geminiKey)
