@@ -266,135 +266,146 @@ class PiperTtsEngine(
     }
 
     private fun playAudio(samples: FloatArray, sampleRate: Int, utteranceId: String) {
-        synchronized(playLock) {
-            val shortSamples = ShortArray(samples.size) { i ->
-                (samples[i].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
+        val minBuf = AudioTrack.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.ENCODING_PCM_FLOAT
+        )
+
+        if (minBuf <= 0) {
+            Log.e(TAG, "❌ getMinBufferSize=$minBuf")
+            isSpeakingFlag.set(false)
+            if (queue.isEmpty()) {
+                onSpeechDone?.invoke()
             }
+            return
+        }
 
-            val minBuf = AudioTrack.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            )
+        val bufferSize = minBuf * 2
 
-            if (minBuf <= 0) {
-                Log.e(TAG, "❌ getMinBufferSize=$minBuf")
-                isSpeakingFlag.set(false)
-                if (queue.isEmpty()) onSpeechDone?.invoke()
-                return
+        val track = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .setBufferSizeInBytes(bufferSize)
+                .build()
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ AudioTrack.Builder failed", e)
+            isSpeakingFlag.set(false)
+            if (queue.isEmpty()) {
+                onSpeechDone?.invoke()
             }
+            return
+        }
 
-            val bufferSize = minBuf * 2
-
-            val track = try {
-                AudioTrack.Builder()
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build()
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
-                            .setSampleRate(sampleRate)
-                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                            .build()
-                    )
-                    .setTransferMode(AudioTrack.MODE_STREAM)
-                    .setBufferSizeInBytes(bufferSize)
-                    .build()
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ AudioTrack.Builder failed", e)
-                isSpeakingFlag.set(false)
-                if (queue.isEmpty()) onSpeechDone?.invoke()
-                return
+        if (track.state != AudioTrack.STATE_INITIALIZED) {
+            Log.e(TAG, "❌ AudioTrack NOT initialized!")
+            track.release()
+            isSpeakingFlag.set(false)
+            if (queue.isEmpty()) {
+                onSpeechDone?.invoke()
             }
+            return
+        }
 
-            if (track.state != AudioTrack.STATE_INITIALIZED) {
-                Log.e(TAG, "❌ AudioTrack NOT initialized!")
-                track.release()
-                isSpeakingFlag.set(false)
-                if (queue.isEmpty()) onSpeechDone?.invoke()
-                return
-            }
+        val oldTrack = audioTrack
+        audioTrack = track
 
-            audioTrack?.let {
-                try {
-                    it.stop()
-                } catch (_: Exception) {
+        try {
+            oldTrack?.pause()
+        } catch (_: Exception) {
+        }
+
+        try {
+            oldTrack?.flush()
+        } catch (_: Exception) {
+        }
+
+        try {
+            oldTrack?.stop()
+        } catch (_: Exception) {
+        }
+
+        try {
+            oldTrack?.release()
+        } catch (_: Exception) {
+        }
+
+        isSpeakingFlag.set(true)
+        onSpeechStart?.invoke()
+
+        Log.d(
+            TAG,
+            "▶ Playing [$utteranceId] sr=$sampleRate, samples=${samples.size}, minBuf=$minBuf, buf=$bufferSize"
+        )
+
+        try {
+            track.play()
+
+            var offset = 0
+            while (offset < samples.size && isSpeakingFlag.get() && audioTrack === track) {
+                val written = track.write(
+                    samples,
+                    offset,
+                    samples.size - offset,
+                    AudioTrack.WRITE_BLOCKING
+                )
+
+                if (written < 0) {
+                    Log.e(TAG, "❌ AudioTrack write error: $written")
+                    break
                 }
-                it.release()
+
+                if (written == 0) {
+                    Log.w(TAG, "⚠ AudioTrack write returned 0")
+                    break
+                }
+
+                offset += written
             }
-
-            audioTrack = track
-            isSpeakingFlag.set(true)
-            onSpeechStart?.invoke()
-
-            Log.d(
-                TAG,
-                "▶ Playing [$utteranceId] sr=$sampleRate, samples=${shortSamples.size}, minBuf=$minBuf, buf=$bufferSize"
-            )
+        } catch (e: InterruptedException) {
+            Log.w(TAG, "⚠ Playback interrupted for $utteranceId", e)
+            Thread.currentThread().interrupt()
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Playback failed [$utteranceId]", e)
+        } finally {
+            try {
+                if (track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                    track.stop()
+                }
+            } catch (_: Exception) {
+            }
 
             try {
-                track.play()
-
-                var offset = 0
-                while (offset < shortSamples.size && isSpeakingFlag.get()) {
-                    val written = track.write(
-                        shortSamples,
-                        offset,
-                        shortSamples.size - offset,
-                        AudioTrack.WRITE_BLOCKING
-                    )
-
-                    if (written < 0) {
-                        Log.e(TAG, "❌ AudioTrack write error: $written")
-                        break
-                    }
-
-                    if (written == 0) {
-                        Log.w(TAG, "⚠ AudioTrack write returned 0, break to avoid infinite loop")
-                        break
-                    }
-
-                    offset += written
-                }
-
-                // Đợi phát nốt phần còn lại đang nằm trong native buffer
-                if (isSpeakingFlag.get()) {
-                    val tailMs = ((bufferSize / 2.0) / sampleRate * 1000.0).toLong() + 50L
-                    Thread.sleep(tailMs)
-                }
-            } catch (e: InterruptedException) {
-                Log.w(TAG, "⚠ Playback interrupted for $utteranceId", e)
-                Thread.currentThread().interrupt()
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Playback failed [$utteranceId]", e)
-            } finally {
-                try {
-                    if (track.playState == AudioTrack.PLAYSTATE_PLAYING) {
-                        track.stop()
-                    }
-                } catch (_: IllegalStateException) {
-                }
-
                 track.release()
-
-                if (audioTrack === track) {
-                    audioTrack = null
-                }
-
-                isSpeakingFlag.set(false)
-
-                if (queue.isEmpty()) {
-                    onSpeechDone?.invoke()
-                }
-
-                Log.d(TAG, "✅ Done utterance: $utteranceId")
+            } catch (_: Exception) {
             }
+
+            if (audioTrack === track) {
+                audioTrack = null
+            }
+
+            val wasSpeaking = isSpeakingFlag.getAndSet(false)
+            if (wasSpeaking && queue.isEmpty()) {
+                onSpeechDone?.invoke()
+            }
+
+            Log.d(TAG, "✅ Done utterance: $utteranceId")
         }
     }
+
 
 }
 
