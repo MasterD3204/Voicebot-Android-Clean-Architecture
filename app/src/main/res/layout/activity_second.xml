@@ -113,7 +113,7 @@
             android:text="⚙️"
             android:textSize="18sp"
             android:paddingStart="14dp"
-            android:visibility="gone"
+            android:visibility="visible"
             android:paddingEnd="14dp"
             app:backgroundTint="#374151"/>
 
@@ -135,7 +135,7 @@
             android:layout_height="wrap_content"
             android:text="Xóa &amp; Reset"
             android:enabled="false"
-            android:visibility="gone"
+            android:visibility="visible"
             app:backgroundTint="#EF4444"/>
     </LinearLayout>
 
