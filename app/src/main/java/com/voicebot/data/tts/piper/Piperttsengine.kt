@@ -63,50 +63,73 @@ class PiperTtsEngine(
         Log.i(TAG, "═══════════════════════════════════════")
 
         return try {
-            // BƯỚC 1: Copy espeak-ng-data từ assets ra external storage
-            val externalDataDir = copyDataDir(context, espDataDir)
-            Log.i(TAG, "espeak-ng-data path: $externalDataDir")
+            // Copy TOÀN BỘ thư mục model từ assets ra external files dir
+            copyAssets(context, modelDir)
 
-            // BƯỚC 2: Build config
+            val baseDir = File(context.getExternalFilesDir(null), modelDir)
+            val modelFile = File(baseDir, modelName)
+            val tokensFile = File(baseDir, tokensName)
+            val dataDirFile = File(baseDir, "espeak-ng-data")
+
+            if (!modelFile.exists()) {
+                Log.e(TAG, "❌ Model file không tồn tại: ${modelFile.absolutePath}")
+                return false
+            }
+
+            if (!tokensFile.exists()) {
+                Log.e(TAG, "❌ Tokens file không tồn tại: ${tokensFile.absolutePath}")
+                return false
+            }
+
+            if (!dataDirFile.exists() || !dataDirFile.isDirectory) {
+                Log.e(TAG, "❌ espeak-ng-data không tồn tại: ${dataDirFile.absolutePath}")
+                return false
+            }
+
             val vitsConfig = OfflineTtsVitsModelConfig(
-                model   = "$modelDir/$modelName",       // → "vits-piper-vi-ngochuyen/ngochuyen.onnx"
-                tokens  = "$modelDir/$tokensName",      // → "vits-piper-vi-ngochuyen/tokens.txt"
-                dataDir = externalDataDir               // → "/storage/.../vits-piper-vi-ngochuyen/espeak-ng-data"
+                model = modelFile.absolutePath,
+                tokens = tokensFile.absolutePath,
+                dataDir = dataDirFile.absolutePath
             )
 
             val modelConfig = OfflineTtsModelConfig(
-                vits       = vitsConfig,
+                vits = vitsConfig,
                 numThreads = numThreads,
-                provider   = "cpu",
-                debug      = true
+                provider = "cpu",
+                debug = true
             )
 
             val config = OfflineTtsConfig(model = modelConfig)
 
-            // BƯỚC 3: Tạo OfflineTts VỚI assetManager
             Log.i(TAG, "⚡ Config:")
             Log.i(TAG, "   model   = ${vitsConfig.model}")
             Log.i(TAG, "   tokens  = ${vitsConfig.tokens}")
             Log.i(TAG, "   dataDir = ${vitsConfig.dataDir}")
-            Log.i(TAG, "⚡ Đang gọi OfflineTts(assetManager=...)...")
+            Log.i(TAG, "⚡ Đang gọi OfflineTts(assetManager = null, ...)")
 
+            tts?.free()
             tts = OfflineTts(
-                assetManager = context.assets,
+                assetManager = null,
                 config = config
             )
-            Log.i(TAG, "✅ OfflineTts tạo thành công!")
 
             val sr = tts!!.sampleRate()
+            Log.i(TAG, "✅ OfflineTts tạo thành công")
             Log.i(TAG, "   sampleRate = $sr Hz")
+
             if (sr <= 0) {
                 Log.e(TAG, "❌ sampleRate không hợp lệ")
+                tts?.free()
+                tts = null
                 return false
             }
 
-            startWorker()
+            if (worker?.isActive != true) {
+                startWorker()
+            }
+
             Log.i(TAG, "  PiperTtsEngine READY ✅")
             true
-
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "❌ UnsatisfiedLinkError", e)
             false
@@ -115,6 +138,7 @@ class PiperTtsEngine(
             false
         }
     }
+
 
 
     // ── Copy espeak-ng-data từ assets ra external storage ────
@@ -244,7 +268,7 @@ class PiperTtsEngine(
     private fun playAudio(samples: FloatArray, sampleRate: Int, utteranceId: String) {
         synchronized(playLock) {
             val shortSamples = ShortArray(samples.size) { i ->
-                (samples[i].coerceIn(-1f, 1f) * 32767).toInt().toShort()
+                (samples[i].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
             }
 
             val minBuf = AudioTrack.getMinBufferSize(
@@ -255,13 +279,12 @@ class PiperTtsEngine(
 
             if (minBuf <= 0) {
                 Log.e(TAG, "❌ getMinBufferSize=$minBuf")
+                isSpeakingFlag.set(false)
                 if (queue.isEmpty()) onSpeechDone?.invoke()
                 return
             }
 
-            // ★ KEY FIX: Dùng minBuf (KHÔNG coerceAtLeast với data size)
-            // Điều này đảm bảo write() sẽ BLOCK khi buffer đầy
-            val bufferSize = minBuf
+            val bufferSize = minBuf * 2
 
             val track = try {
                 AudioTrack.Builder()
@@ -283,6 +306,7 @@ class PiperTtsEngine(
                     .build()
             } catch (e: Exception) {
                 Log.e(TAG, "❌ AudioTrack.Builder failed", e)
+                isSpeakingFlag.set(false)
                 if (queue.isEmpty()) onSpeechDone?.invoke()
                 return
             }
@@ -290,50 +314,87 @@ class PiperTtsEngine(
             if (track.state != AudioTrack.STATE_INITIALIZED) {
                 Log.e(TAG, "❌ AudioTrack NOT initialized!")
                 track.release()
+                isSpeakingFlag.set(false)
                 if (queue.isEmpty()) onSpeechDone?.invoke()
                 return
             }
 
             audioTrack?.let {
-                try { it.stop() } catch (_: Exception) {}
+                try {
+                    it.stop()
+                } catch (_: Exception) {
+                }
                 it.release()
             }
-            audioTrack = track
 
+            audioTrack = track
             isSpeakingFlag.set(true)
             onSpeechStart?.invoke()
 
-            Log.d(TAG, "▶ Playing [$utteranceId] sr=$sampleRate, samples=${shortSamples.size}, buf=$bufferSize")
-            track.play()
-
-            // ★ write() sẽ BLOCK vì buffer nhỏ hơn data → đợi audio phát
-            val chunkSize = 2048
-            var offset = 0
-            while (offset < shortSamples.size && isSpeakingFlag.get()) {
-                val end = minOf(offset + chunkSize, shortSamples.size)
-                val written = track.write(shortSamples, offset, end - offset)
-                if (written < 0) {
-                    Log.e(TAG, "❌ write error: $written")
-                    break
-                }
-                offset += written
-            }
-
-            // ★ ĐỢI buffer phát hết trước khi stop
-            // Sau khi write xong, buffer vẫn còn data chưa phát
-            val remainingMs = (minBuf.toLong() * 1000) / (sampleRate * 2)
-            Thread.sleep(remainingMs + 50)
+            Log.d(
+                TAG,
+                "▶ Playing [$utteranceId] sr=$sampleRate, samples=${shortSamples.size}, minBuf=$minBuf, buf=$bufferSize"
+            )
 
             try {
-                if (isSpeakingFlag.get()) track.stop()
-            } catch (_: IllegalStateException) { }
-            track.release()
-            if (audioTrack === track) audioTrack = null
-            isSpeakingFlag.set(false)
+                track.play()
 
-            if (queue.isEmpty()) onSpeechDone?.invoke()
-            Log.d(TAG, "✅ Done utterance: $utteranceId")
+                var offset = 0
+                while (offset < shortSamples.size && isSpeakingFlag.get()) {
+                    val written = track.write(
+                        shortSamples,
+                        offset,
+                        shortSamples.size - offset,
+                        AudioTrack.WRITE_BLOCKING
+                    )
+
+                    if (written < 0) {
+                        Log.e(TAG, "❌ AudioTrack write error: $written")
+                        break
+                    }
+
+                    if (written == 0) {
+                        Log.w(TAG, "⚠ AudioTrack write returned 0, break to avoid infinite loop")
+                        break
+                    }
+
+                    offset += written
+                }
+
+                // Đợi phát nốt phần còn lại đang nằm trong native buffer
+                if (isSpeakingFlag.get()) {
+                    val tailMs = ((bufferSize / 2.0) / sampleRate * 1000.0).toLong() + 50L
+                    Thread.sleep(tailMs)
+                }
+            } catch (e: InterruptedException) {
+                Log.w(TAG, "⚠ Playback interrupted for $utteranceId", e)
+                Thread.currentThread().interrupt()
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Playback failed [$utteranceId]", e)
+            } finally {
+                try {
+                    if (track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                        track.stop()
+                    }
+                } catch (_: IllegalStateException) {
+                }
+
+                track.release()
+
+                if (audioTrack === track) {
+                    audioTrack = null
+                }
+
+                isSpeakingFlag.set(false)
+
+                if (queue.isEmpty()) {
+                    onSpeechDone?.invoke()
+                }
+
+                Log.d(TAG, "✅ Done utterance: $utteranceId")
+            }
         }
     }
+
 }
 
