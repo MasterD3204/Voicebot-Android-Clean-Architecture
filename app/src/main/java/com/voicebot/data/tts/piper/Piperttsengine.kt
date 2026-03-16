@@ -26,11 +26,11 @@ import java.io.IOException
 class PiperTtsEngine(
     private val context: Context,
     private val modelDir: String   = "vits-piper-vi-ngochuyen",
-    private val modelName: String  = "ngochuyen.onnx",
+    private val modelName: String  = "huongly.onnx",
     private val tokensName: String = "tokens.txt",
     private val espDataDir: String = "vits-piper-vi-ngochuyen/espeak-ng-data",
     private val speakerId: Int     = 0,
-    private val speed: Float       = 0.7f,
+    private val speed: Float       = 0.5f,
     private val numThreads: Int    = 2
 ) : TtsEngine {
 

@@ -47,11 +47,11 @@ data class BotConfig(
 
     // ── Piper TTS assets / config ─────────────────────────────────────────
     val piperModelDir: String      = "vits-piper-vi-ngochuyen",
-    val piperModelName: String     = "ngochuyen.onnx",
+    val piperModelName: String     = "huongly.onnx",
     val piperTokensName: String    = "tokens.txt",
     val piperEspDataDir: String    = "vits-piper-vi-ngochuyen/espeak-ng-data",
     val piperSpeakerId: Int        = 0,
-    val piperSpeed: Float          = 1.0f,
+    val piperSpeed: Float          = 0.7f,
     val piperNumThreads: Int       = 4
 
 )
