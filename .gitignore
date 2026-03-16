@@ -20,3 +20,4 @@ app/src/main/assets/silero_vad.onnx
 app/src/main/assets/text_encoder.onnx
 app/src/main/assets/tts_config.json
 app/src/main/assets/vits-piper-vi-ngochuyen
+.gradle/
