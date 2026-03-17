@@ -34,7 +34,7 @@ class VoiceQueryUseCase(
          * Thêm/bớt tại đây mà không cần thay đổi logic.
          */
         val RAG_KEYWORDS: Set<String> = setOf(
-            "misa", "amis", "meinvoice", "misainvoice",
+            "misa", "amis", "meinvoice", "misainvoice","thơ",
             "công ty", "doanh nghiệp", "tập đoàn",
             "chủ tịch", "giám đốc", "ceo", "ban lãnh đạo",
             "sản phẩm", "phần mềm", "giải pháp", "ứng dụng",
@@ -58,8 +58,8 @@ Hãy trả lời câu hỏi ngắn gọn bằng tiếng Việt dựa trên kiế
         /**
          * Prompt cho nhánh LLM thuần — tổng quát, không ràng buộc domain.
          */
-        private const val PROMPT_GENERAL = """Bạn là trợ lý ảo thông minh. \
-Hãy trả lời câu hỏi sau một cách tự nhiên, ngắn gọn bằng tiếng Việt."""
+        private const val PROMPT_GENERAL = """Bạn là MISA AVA, trợ lý ảo chính thức của MISA. \
+Hãy trả lời câu hỏi sau một cách tự nhiên bằng tiếng Việt. Khi được yêu cầu làm bài thư thì không được từ chối."""
     }
 
     // ── Conversation turn tracking ────────────────────────────────────────

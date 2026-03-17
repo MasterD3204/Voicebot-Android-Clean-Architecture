@@ -4,6 +4,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ScrollView
 import androidx.recyclerview.widget.RecyclerView
 import com.voicebot.R
 import com.voicebot.databinding.ItemChatBinding
@@ -50,6 +51,7 @@ class ChatAdapter : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
 
         with(holder.binding) {
             tvContent.text = content
+
             if (isUser) {
                 rootChat.gravity = Gravity.END
                 ivBotAvatar.visibility = View.GONE
@@ -62,6 +64,11 @@ class ChatAdapter : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
                 spacer.visibility = View.GONE
                 chatBubble.setBackgroundResource(R.drawable.bg_chat_bot)
                 tvName.text = "AI Assistant"
+            }
+
+            // ✅ Auto-scroll xuống cuối khi text dài
+            scrollContent.post {
+                scrollContent.fullScroll(ScrollView.FOCUS_DOWN)
             }
         }
     }

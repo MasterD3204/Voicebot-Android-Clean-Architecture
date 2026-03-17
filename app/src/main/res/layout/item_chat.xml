@@ -21,7 +21,7 @@
     <!-- Khung chữ -->
     <LinearLayout
         android:id="@+id/chatBubble"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
@@ -35,15 +35,23 @@
             android:textSize="12sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvContent"
-            android:layout_width="wrap_content"
+        <!-- ✅ MaxHeightScrollView thay thế TextView trực tiếp -->
+        <com.voicebot.ui.MaxHeightScrollView
+            android:id="@+id/scrollContent"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:lineSpacingExtra="4dp"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textIsSelectable="true"/> <!-- Cho phép copy text -->
+            android:fadeScrollbars="false">
+
+            <TextView
+                android:id="@+id/tvContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="4dp"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textIsSelectable="true"/>
+        </com.voicebot.ui.MaxHeightScrollView>
     </LinearLayout>
 
     <Space

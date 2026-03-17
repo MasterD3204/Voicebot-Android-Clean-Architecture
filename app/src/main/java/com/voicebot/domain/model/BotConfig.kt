@@ -43,7 +43,7 @@ data class BotConfig(
     val llmTemperature: Float = 0.7f,
     val llmTopK: Int = 20,
     val llmTopP: Float = 0.8f,
-    val llmSystemPrompt: String = "Bạn là trợ lý ảo trả lời ngắn gọn tất cả câu hỏi.",
+    val llmSystemPrompt: String = "Bạn là trợ lý ảo trả lời các câu hỏi của người dùng bằng kiến thức của mình. Hạn chế trả lời không biết khi câu hỏi có thể trả lời được.",
 
     // ── Piper TTS assets / config ─────────────────────────────────────────
     val piperModelDir: String      = "vits-piper-vi-ngochuyen",
