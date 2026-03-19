@@ -182,7 +182,6 @@ class VoiceBotOrchestrator(
     private suspend fun consumeStream(flow: Flow<String>) {
         val fullText = StringBuilder()
         val sentenceBuf = StringBuilder()
-        val pendingChunk = StringBuilder()  // Gom các chunk nhỏ cho đến khi đủ MIN_CHUNK_WORDS
 
         flow.collect { chunk ->
             if (isFirstToken) {
@@ -198,35 +197,54 @@ class VoiceBotOrchestrator(
             logToUI("Bot: $fullText", true)  // Hiển thị text gốc trên màn hình
             sentenceBuf.append(chunk)
 
-            while (hasSentenceEnd(sentenceBuf.toString())) {
-                val (sentence, rest) = cutSentence(sentenceBuf.toString())
-                sentenceBuf.clear().append(rest)
-                if (sentence.isBlank()) continue
-
-                // Gom câu vào pendingChunk
-                if (pendingChunk.isEmpty()) pendingChunk.append(sentence)
-                else pendingChunk.append(" ").append(sentence)
-
-                // Khi đủ MIN_CHUNK_WORDS → speak và reset
-                if (countWords(pendingChunk.toString()) >= MIN_CHUNK_WORDS) {
-                    speakText(pendingChunk.toString(), sentenceCount++)
-                    pendingChunk.clear()
-                }
+            // Thử cắt chunk đủ điều kiện: ≥ MIN_CHUNK_WORDS TỪ + kết thúc bằng dấu ngắt
+            var readyChunk = cutReadyChunk(sentenceBuf)
+            while (readyChunk != null) {
+                speakText(readyChunk, sentenceCount++)
+                readyChunk = cutReadyChunk(sentenceBuf)
             }
         }
 
-        // Flush: gom phần còn lại sau khi stream kết thúc
+        // Flush: phần còn lại sau khi stream kết thúc — speak tất cả dù ngắn
         val tail = sentenceBuf.toString().trim()
         if (tail.isNotBlank()) {
-            if (pendingChunk.isEmpty()) pendingChunk.append(tail)
-            else pendingChunk.append(" ").append(tail)
-        }
-
-        if (pendingChunk.isNotBlank()) {
-            speakText(pendingChunk.toString(), sentenceCount++)
+            speakText(tail, sentenceCount++)
         }
 
         finalizeTtsQueue()
+    }
+
+    /**
+     * Cố gắng cắt một chunk "đủ điều kiện" từ đầu [buf]:
+     *   - Tìm vị trí dấu ngắt (. , ? ! : \n) từ trái sang phải
+     *   - Nếu đoạn text từ đầu đến dấu ngắt đó có ĐỦ MIN_CHUNK_WORDS từ → cắt và trả về
+     *   - Nếu chưa đủ → tìm dấu ngắt tiếp theo và thử lại
+     *   - Nếu không còn dấu ngắt nào → trả về null (chờ thêm dữ liệu)
+     *
+     * Ví dụ với buf = "xin chào bạn, tôi là mi sa a va, trợ lý ảo":
+     *   - Dấu ngắt 1 tại idx 13 ("xin chào bạn,") → 3 từ < 7 → bỏ qua
+     *   - Dấu ngắt 2 tại idx 30 ("xin chào bạn, tôi là mi sa a va,") → 8 từ ≥ 7 → cắt!
+     *   - buf còn lại: "trợ lý ảo"
+     */
+    private fun cutReadyChunk(buf: StringBuilder): String? {
+        val text = buf.toString()
+        val breakPattern = Regex("[.,?!:\\n]")
+        var searchFrom = 0
+
+        while (searchFrom < text.length) {
+            val match = breakPattern.find(text, searchFrom) ?: break
+            val endIdx = match.range.last + 1          // bao gồm dấu ngắt
+            val candidate = text.substring(0, endIdx).trim()
+            if (countWords(candidate) >= MIN_CHUNK_WORDS) {
+                // Đủ điều kiện — cắt khỏi buf
+                val remaining = text.substring(endIdx).trimStart()
+                buf.clear().append(remaining)
+                return candidate
+            }
+            // Chưa đủ từ → thử dấu ngắt tiếp theo
+            searchFrom = match.range.last + 1
+        }
+        return null  // Chưa đủ điều kiện, chờ thêm dữ liệu
     }
 
     /** Đếm số từ trong chuỗi */
@@ -236,15 +254,6 @@ class VoiceBotOrchestrator(
     private fun finalizeTtsQueue() {
         isTtsQueueComplete = true
         ttsEngine.markQueueComplete()
-    }
-
-    private fun hasSentenceEnd(text: String) =
-        text.any { it == '.' || it == '?' || it == '!' || it == '\n' || it == ',' || it == ':' }
-
-    private fun cutSentence(text: String): Pair<String, String> {
-        val idx = Regex("[.?!,:\\n]").find(text)?.range?.last?.plus(1)
-            ?: return "" to text
-        return text.substring(0, idx).trim() to text.substring(idx).trim()
     }
 
     private fun speakText(text: String, id: Int) {
