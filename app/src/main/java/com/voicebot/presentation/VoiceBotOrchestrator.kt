@@ -75,6 +75,7 @@ class VoiceBotOrchestrator(
     init {
         ttsEngine.onSpeechStart = { setBotBusy(true) }
         ttsEngine.onSynthesisTime = { ms ->
+            // Update metrics ngay khi nhận — đây là giá trị inference thuần của TTS engine
             currentMetrics = currentMetrics.copy(ttsSynthesisMs = ms)
             notifyMetrics()
         }
@@ -278,7 +279,8 @@ class VoiceBotOrchestrator(
     }
 
     private fun notifyMetrics() {
-        CoroutineScope(Dispatchers.Main).launch { onMetricsUpdate?.invoke(currentMetrics) }
+        val snapshot = currentMetrics   // capture ngay trên calling thread trước khi launch
+        CoroutineScope(Dispatchers.Main).launch { onMetricsUpdate?.invoke(snapshot) }
     }
 
     private fun logToUI(msg: String, isUpdate: Boolean) {

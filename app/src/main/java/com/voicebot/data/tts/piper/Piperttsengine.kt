@@ -63,6 +63,10 @@ class PiperTtsEngine(
     private val doneCount   = AtomicInteger(0)
     private var queueMarkedComplete = false
 
+    /** Thời gian synthesize (ms) của utterance gần nhất — đọc bởi Orchestrator sau onSynthesisTime */
+    @Volatile var lastSynthesisMs: Long = 0L
+        private set
+
     // ── Text pre-processor (khởi tạo sau khi init() thành công) ──────────
     private var preProcessor: PiperTextPreProcessor? = null
 
@@ -273,7 +277,10 @@ class PiperTtsEngine(
             Log.d(TAG, "  -> ${audio.samples.size} samples @ ${audio.sampleRate}Hz ( ${elapsed}ms)")
 
             // Report thời gian synthesize thuần cho utterance đầu tiên
-            if (utteranceId == "utt_0") onSynthesisTime?.invoke(elapsed)
+            if (utteranceId == "utt_0") {
+                lastSynthesisMs = elapsed
+                onSynthesisTime?.invoke(elapsed)
+            }
 
             if (audio.samples.isEmpty()) {
                 Log.w(TAG, "⚠ Empty audio for $utteranceId")
