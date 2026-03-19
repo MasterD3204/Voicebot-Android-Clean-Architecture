@@ -4,6 +4,7 @@ import android.util.Log
 import com.voicebot.domain.port.LlmEngine
 import com.voicebot.domain.port.RagEngine
 import kotlinx.coroutines.flow.Flow
+import java.util.Calendar
 
 /**
  * Core business logic xử lý voice query theo 3 bước:
@@ -29,12 +30,8 @@ class VoiceQueryUseCase(
     companion object {
         private const val TAG = "VoiceQueryUseCase"
 
-        /**
-         * Từ khóa kích hoạt RAG.
-         * Thêm/bớt tại đây mà không cần thay đổi logic.
-         */
         val RAG_KEYWORDS: Set<String> = setOf(
-            "misa", "amis", "meinvoice", "misainvoice","thơ",
+            "misa", "amis", "meinvoice", "misainvoice",
             "công ty", "doanh nghiệp", "tập đoàn",
             "chủ tịch", "giám đốc", "ceo", "ban lãnh đạo",
             "sản phẩm", "phần mềm", "giải pháp", "ứng dụng",
@@ -42,38 +39,56 @@ class VoiceQueryUseCase(
             "khách hàng", "đối tác", "trụ sở", "địa chỉ"
         )
 
-        /**
-         * Prompt cho nhánh RAG — yêu cầu LLM bám sát context được cung cấp.
-         */
-        private const val PROMPT_RAG_WITH_CONTEXT = """Bạn là trợ lý ảo chính thức của MISA. \
-Dựa vào thông tin tham khảo bên dưới để trả lời câu hỏi một cách chính xác, ngắn gọn bằng tiếng Việt. \
-Chỉ sử dụng thông tin được cung cấp, không bịa thêm."""
+        /** Lấy ngày hiện tại dạng gọn — offline, không cần quyền */
+        private fun today(): String {
+            val c = Calendar.getInstance()
+            val dow = arrayOf("Chủ nhật","Thứ hai","Thứ ba","Thứ tư","Thứ năm","Thứ sáu","Thứ bảy")
+            return "${dow[c.get(Calendar.DAY_OF_WEEK) - 1]}, ngày ${c.get(Calendar.DAY_OF_MONTH)} " +
+                   "tháng ${c.get(Calendar.MONTH) + 1} năm ${c.get(Calendar.YEAR)}"
+        }
 
         /**
-         * Prompt khi có keyword nhưng RAG không tìm được kết quả.
+         * System prompt dùng chung cho mọi nhánh.
+         * Các placeholder {DATE} được thay khi gọi buildSystemBlock().
          */
-        private const val PROMPT_RAG_NO_CONTEXT = """Bạn là trợ lý ảo chính thức của MISA. \
-Hãy trả lời câu hỏi ngắn gọn bằng tiếng Việt dựa trên kiến thức của bạn về MISA."""
+        private const val SYSTEM_TEMPLATE = """Mày là MISA AVA, trợ lý ảo của công ty MISA. Hôm nay: {DATE}.
+Quy tắc:
+1. Chỉ chào khi đây là tin nhắn đầu tiên của cuộc trò chuyện.
+2. Xưng hô nhất quán theo người dùng: nếu họ dùng "bạn/tôi" thì mày dùng "tôi/bạn"; nếu họ gọi mày bằng "em/anh/chị" thì mày xưng theo chiều ngược lại.
+3. Trả lời bằng tiếng Việt, ngắn gọn, tự nhiên như hội thoại nói.
+4. Dùng tối đa kiến thức nội tại: thơ, văn, kiến thức chung, lời khuyên sức khỏe cơ bản, v.v. đều trả lời được.
+5. Chỉ từ chối khi câu hỏi cần dữ liệu thời gian thực (giá vàng, thời tiết, tỷ giá) hoặc thông tin nội bộ không có trong kiến thức. Khi từ chối: nói đúng một câu "Tôi không có thông tin đó." rồi nêu ngắn gọn mày có thể giúp gì."""
+
+        private fun buildSystemBlock() = SYSTEM_TEMPLATE.replace("{DATE}", today())
 
         /**
-         * Prompt cho nhánh LLM thuần — tổng quát, không ràng buộc domain.
+         * Prompt RAG — có context từ database.
+         * Ngắn gọn: system block + context + câu hỏi.
          */
-        private const val PROMPT_GENERAL = """Bạn là MISA AVA, trợ lý ảo chính thức của MISA. \
-Hãy trả lời câu hỏi sau một cách tự nhiên bằng tiếng Việt. Khi được yêu cầu làm bài thư thì không được từ chối."""
+        private fun buildRagWithContextPrompt(query: String, contexts: List<String>): String {
+            val ctx = contexts.mapIndexed { i, c -> "[${i+1}] $c" }.joinToString("\n")
+            return "${buildSystemBlock()}\n\nTài liệu tham khảo:\n$ctx\n\nNgười dùng: $query"
+        }
+
+        /**
+         * Prompt RAG — không tìm được context.
+         */
+        private fun buildRagNoContextPrompt(query: String) =
+            "${buildSystemBlock()}\n\nNgười dùng: $query"
+
+        /**
+         * Prompt General — câu hỏi tổng quát, không liên quan MISA.
+         */
+        private fun buildGeneralPrompt(query: String) =
+            "${buildSystemBlock()}\n\nNgười dùng: $query"
     }
 
     // ── Conversation turn tracking ────────────────────────────────────────
-    // Đếm số lượt trong nhánh general để reset định kỳ, tránh overflow context.
-    // Nhánh RAG đã reset trước mỗi lượt nên không cần đếm.
     private var generalTurnCount = 0
-    private val MAX_GENERAL_TURNS = 3   // reset sau 3 lượt general để tránh context overflow
+    private val MAX_GENERAL_TURNS = 3
 
     // ── Public API ────────────────────────────────────────────────────────
 
-    /**
-     * Xử lý query và trả về kết quả phù hợp.
-     * Lịch sử hội thoại được duy trì tự động bởi LlmEngine.
-     */
     suspend fun execute(rawQuery: String): QueryResult {
         val query      = rawQuery.trim()
         val queryLower = query.lowercase()
@@ -85,14 +100,13 @@ Hãy trả lời câu hỏi sau một cách tự nhiên bằng tiếng Việt. K
 
         if (!llmEngine.isReady()) return QueryResult.Error("LLM engine chưa sẵn sàng.")
 
-        // Bước 2 — RAG_ONLY: RagOnlyLlmEngine tự xử lý search + ngưỡng nội bộ
-        //          Không cần keyword routing hay ragEngine bên ngoài
+        // Bước 2 — RAG_ONLY
         if (isRagOnly) {
-            Log.i(TAG, "Nhánh RAG_ONLY — gọi thẳng RagOnlyLlmEngine")
+            Log.i(TAG, "Nhánh RAG_ONLY")
             return QueryResult.LlmStream(llmEngine.chatStream(query))
         }
 
-        // Bước 3 — Keyword check: RAG hay LLM thuần?
+        // Bước 3 — Routing
         return if (containsRagKeyword(queryLower)) {
             handleWithRag(query, queryLower)
         } else {
@@ -100,7 +114,6 @@ Hãy trả lời câu hỏi sau một cách tự nhiên bằng tiếng Việt. K
         }
     }
 
-    /** Xóa ngữ cảnh hội thoại, bắt đầu phiên mới. */
     fun resetHistory() {
         llmEngine.resetHistory()
         generalTurnCount = 0
@@ -110,56 +123,26 @@ Hãy trả lời câu hỏi sau một cách tự nhiên bằng tiếng Việt. K
 
     private suspend fun handleWithRag(query: String, queryLower: String): QueryResult {
         val contexts = ragEngine.search(queryLower)
-
-        // ── Reset history trước mỗi RAG turn ─────────────────────────────
-        // RAG context (~200-500 token × 3 kết quả) tích lũy rất nhanh trong
-        // conversation history → sau 2-3 turn sẽ vượt context window → model
-        // sinh ra token rác (single char, ký tự lạ).
-        // RAG prompt đã tự chứa đủ thông tin → không cần giữ history giữa
-        // các RAG turn. History chỉ có giá trị cho hội thoại tự nhiên (GENERAL).
-        llmEngine.resetHistory()
+        llmEngine.resetHistory()   // RAG context lớn, không tích history giữa các turn
 
         return if (!contexts.isNullOrEmpty()) {
-            Log.i(TAG, "Nhánh RAG — ${contexts.size} context(s) tìm được")
-            val prompt = buildRagPrompt(query, contexts)
-            QueryResult.LlmStream(llmEngine.chatStream(prompt))
+            Log.i(TAG, "RAG — ${contexts.size} context(s)")
+            QueryResult.LlmStream(llmEngine.chatStream(buildRagWithContextPrompt(query, contexts)))
         } else {
-            Log.i(TAG, "Nhánh RAG — không tìm được context, dùng LLM + gợi ý domain")
-            val prompt = "$PROMPT_RAG_NO_CONTEXT\n\nCâu hỏi: $query"
-            QueryResult.LlmStream(llmEngine.chatStream(prompt))
+            Log.i(TAG, "RAG — không có context, dùng LLM + system")
+            QueryResult.LlmStream(llmEngine.chatStream(buildRagNoContextPrompt(query)))
         }
     }
 
     private fun handleGeneral(query: String): QueryResult {
         generalTurnCount++
-        // Reset định kỳ sau MAX_GENERAL_TURNS lượt để tránh context overflow
         if (generalTurnCount > MAX_GENERAL_TURNS) {
-            Log.i(TAG, "General turn $generalTurnCount > $MAX_GENERAL_TURNS — resetting history")
+            Log.i(TAG, "General turn $generalTurnCount > $MAX_GENERAL_TURNS — reset history")
             llmEngine.resetHistory()
             generalTurnCount = 1
         }
-        Log.i(TAG, "Nhánh General — lượt $generalTurnCount/$MAX_GENERAL_TURNS")
-        val prompt = "$PROMPT_GENERAL\n\nCâu hỏi: $query"
-        return QueryResult.LlmStream(llmEngine.chatStream(prompt))
-    }
-
-    // ── Prompt builders ───────────────────────────────────────────────────
-
-    /**
-     * Gộp các đoạn context từ RAG thành prompt augmented.
-     * Mỗi context là phần trả lời (sau dấu |) từ QA database.
-     */
-    private fun buildRagPrompt(query: String, contexts: List<String>): String {
-        val contextBlock = contexts
-            .mapIndexed { i, ctx -> "[${i + 1}] $ctx" }
-            .joinToString("\n")
-
-        return """$PROMPT_RAG_WITH_CONTEXT
-
-Thông tin tham khảo:
-$contextBlock
-
-Câu hỏi: $query"""
+        Log.i(TAG, "General — lượt $generalTurnCount/$MAX_GENERAL_TURNS")
+        return QueryResult.LlmStream(llmEngine.chatStream(buildGeneralPrompt(query)))
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -168,7 +151,6 @@ Câu hỏi: $query"""
         RAG_KEYWORDS.any { query.lowercase().contains(it) }
 }
 
-/** Discriminated union của tất cả kết quả có thể */
 sealed class QueryResult {
     data class Acknowledgment(val response: String) : QueryResult()
     data class LlmStream(val flow: Flow<String>)    : QueryResult()
