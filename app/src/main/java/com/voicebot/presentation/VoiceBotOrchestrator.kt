@@ -12,7 +12,6 @@ import com.voicebot.domain.model.TtsType
 import com.voicebot.domain.port.LlmEngine
 import com.voicebot.domain.port.RagEngine
 import com.voicebot.domain.port.SttEngine
-import com.voicebot.domain.port.TextNormalizer
 import com.voicebot.domain.port.TtsEngine
 import com.voicebot.domain.usecase.BargeInDetector
 import com.voicebot.domain.usecase.QueryResult
@@ -34,7 +33,10 @@ class VoiceBotOrchestrator(
     private val context: Context,
     private val config: BotConfig = BotConfig()
 ) {
-    companion object { private const val TAG = "VoiceBotOrchestrator" }
+    companion object {
+        private const val TAG = "VoiceBotOrchestrator"
+        private const val MIN_CHUNK_WORDS = 7   // Piper TTS phát âm tốt hơn với chunk ≥7 từ
+    }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -43,7 +45,6 @@ class VoiceBotOrchestrator(
     private val llmEngine: LlmEngine = EngineFactory.createLlmEngine(context, config)
     val ttsEngine: TtsEngine = EngineFactory.createTtsEngine(context, config)
     private val ragEngine: RagEngine = EngineFactory.createRagEngine(context, config.ragType)
-    private val textNormalizer: TextNormalizer = EngineFactory.createTextNormalizer(context)
 
     // ── Use case ──────────────────────────────────────────────────────────
     private val useCase = VoiceQueryUseCase(
@@ -181,6 +182,7 @@ class VoiceBotOrchestrator(
     private suspend fun consumeStream(flow: Flow<String>) {
         val fullText = StringBuilder()
         val sentenceBuf = StringBuilder()
+        val pendingChunk = StringBuilder()  // Gom các chunk nhỏ cho đến khi đủ MIN_CHUNK_WORDS
 
         flow.collect { chunk ->
             if (isFirstToken) {
@@ -193,19 +195,43 @@ class VoiceBotOrchestrator(
                 isFirstToken = false
             }
             fullText.append(chunk)
-            logToUI("Bot: $fullText", true)
+            logToUI("Bot: $fullText", true)  // Hiển thị text gốc trên màn hình
             sentenceBuf.append(chunk)
 
             while (hasSentenceEnd(sentenceBuf.toString())) {
                 val (sentence, rest) = cutSentence(sentenceBuf.toString())
-                if (sentence.isNotBlank()) speakText(sentence, sentenceCount++)
                 sentenceBuf.clear().append(rest)
+                if (sentence.isBlank()) continue
+
+                // Gom câu vào pendingChunk
+                if (pendingChunk.isEmpty()) pendingChunk.append(sentence)
+                else pendingChunk.append(" ").append(sentence)
+
+                // Khi đủ MIN_CHUNK_WORDS → speak và reset
+                if (countWords(pendingChunk.toString()) >= MIN_CHUNK_WORDS) {
+                    speakText(pendingChunk.toString(), sentenceCount++)
+                    pendingChunk.clear()
+                }
             }
         }
 
-        if (sentenceBuf.isNotBlank()) speakText(sentenceBuf.toString(), sentenceCount++)
+        // Flush: gom phần còn lại sau khi stream kết thúc
+        val tail = sentenceBuf.toString().trim()
+        if (tail.isNotBlank()) {
+            if (pendingChunk.isEmpty()) pendingChunk.append(tail)
+            else pendingChunk.append(" ").append(tail)
+        }
+
+        if (pendingChunk.isNotBlank()) {
+            speakText(pendingChunk.toString(), sentenceCount++)
+        }
+
         finalizeTtsQueue()
     }
+
+    /** Đếm số từ trong chuỗi */
+    private fun countWords(text: String): Int =
+        text.trim().split(Regex("\\s+")).count { it.isNotBlank() }
 
     private fun finalizeTtsQueue() {
         isTtsQueueComplete = true
@@ -230,7 +256,9 @@ class VoiceBotOrchestrator(
         CoroutineScope(Dispatchers.Main).launch {
             onTtsStartWithLength?.invoke(isLong)
         }
-        ttsEngine.speak(textNormalizer.normalize(text), "utt_$id")
+        // Pass raw text — mỗi TTS engine tự normalize theo đặc thù của mình
+        // (PiperTtsEngine dùng PiperTextPreProcessor, AndroidTtsEngine không cần normalize)
+        ttsEngine.speak(text, "utt_$id")
     }
 
     // ── State management ──────────────────────────────────────────────────

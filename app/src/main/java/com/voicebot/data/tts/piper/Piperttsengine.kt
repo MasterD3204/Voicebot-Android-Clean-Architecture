@@ -11,6 +11,7 @@ import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import com.voicebot.domain.port.TtsEngine
+import com.voicebot.data.normalizer.PiperTextPreProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,6 +61,9 @@ class PiperTtsEngine(
     private val queuedCount = AtomicInteger(0)
     private val doneCount   = AtomicInteger(0)
     private var queueMarkedComplete = false
+
+    // ── Text pre-processor (khởi tạo sau khi init() thành công) ──────────
+    private var preProcessor: PiperTextPreProcessor? = null
 
     // ── Init ──────────────────────────────────────────────────
 
@@ -113,6 +117,7 @@ class PiperTtsEngine(
             }
 
             startWorker()
+            preProcessor = PiperTextPreProcessor(context)
             Log.i(TAG, "  PiperTtsEngine READY ✅")
             true
 
@@ -191,9 +196,11 @@ class PiperTtsEngine(
             return
         }
         if (text.isBlank()) return
-        Log.d(TAG, "▶ Enqueue [$utteranceId]: \"${text.take(50)}\"")
+        // Apply pre-processing: clean symbols + convert numbers + hyphenate MISA products
+        val processed = preProcessor?.process(text) ?: text
+        Log.d(TAG, "▶ Enqueue [$utteranceId]: \"${processed.take(60)}\"")
         queuedCount.incrementAndGet()
-        queue.offer(text.trim() to utteranceId)
+        queue.offer(processed.trim() to utteranceId)
     }
 
     override fun stop() {
