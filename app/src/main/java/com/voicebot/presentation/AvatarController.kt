@@ -278,7 +278,7 @@ class AvatarController(
 
     private fun setupAnimationLoop() {
         var lastFrameTime = System.nanoTime()
-        sceneView.onFrame = { _ ->
+        sceneView.onFrame = onFrame@{ _ ->
             if (!sceneView.isAttachedToWindow) return@onFrame
             modelNode?.modelInstance?.animator?.let { animator ->
                 if (animator.animationCount > 0 && currentAnimationIndex < animator.animationCount) {
