@@ -24,6 +24,7 @@ import com.voicebot.domain.model.SttType
 import com.voicebot.domain.model.TtsType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
