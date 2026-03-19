@@ -48,10 +48,11 @@ class VoiceBotOrchestrator(
 
     // ── Use case ──────────────────────────────────────────────────────────
     private val useCase = VoiceQueryUseCase(
-        ragEngine      = ragEngine,
-        llmEngine      = llmEngine,
+        ragEngine       = ragEngine,
+        llmEngine       = llmEngine,
         bargeInDetector = BargeInDetector(),
-        isRagOnly      = (config.llmType == com.voicebot.domain.model.LlmType.RAG_ONLY)
+        isRagOnly       = (config.llmType == com.voicebot.domain.model.LlmType.RAG_ONLY),
+        noThink         = config.noThink
     )
 
     // ── State ─────────────────────────────────────────────────────────────

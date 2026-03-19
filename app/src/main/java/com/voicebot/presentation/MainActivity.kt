@@ -227,7 +227,9 @@ class MainActivity : AppCompatActivity() {
             liteRtModelName        = if (llmType == LlmType.LITE_RT)     modelName else BotConfig().liteRtModelName,
             nativeLlmModelName     = if (llmType == LlmType.NATIVE_CPP)  modelName else BotConfig().nativeLlmModelName,
             execuTorchFolderName   = if (llmType == LlmType.EXECUTORCH)  modelName else BotConfig().execuTorchFolderName,
-            llmSystemPrompt = "Bạn là trợ lý ảo của MISA. Trả lời ngắn gọn bằng tiếng Việt."
+            llmSystemPrompt = "Bạn là trợ lý ảo của MISA. Trả lời ngắn gọn bằng tiếng Việt.",
+            // Qwen3 0.6B mặc định thinking mode — tắt bằng /no_think
+            noThink = llmType == LlmType.LITE_RT && modelName.contains("0.6b", ignoreCase = true)
         )
     }
 

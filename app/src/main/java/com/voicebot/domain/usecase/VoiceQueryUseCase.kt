@@ -24,7 +24,8 @@ class VoiceQueryUseCase(
     private val ragEngine: RagEngine,
     private val llmEngine: LlmEngine,
     private val bargeInDetector: BargeInDetector,
-    private val isRagOnly: Boolean = false   // ← RAG_ONLY mode: bypass LLM routing
+    private val isRagOnly: Boolean = false,   // ← RAG_ONLY mode: bypass LLM routing
+    private val noThink: Boolean = false      // ← Qwen3 0.6B: append /no_think to every prompt
 ) {
 
     companion object {
@@ -60,28 +61,22 @@ Quy tắc:
 5. Chỉ từ chối khi câu hỏi cần dữ liệu thời gian thực (giá vàng, thời tiết, tỷ giá) hoặc thông tin nội bộ không có trong kiến thức. Khi từ chối: nói đúng một câu "Tôi không có thông tin đó." rồi nêu ngắn gọn mày có thể giúp gì."""
 
         private fun buildSystemBlock() = SYSTEM_TEMPLATE.replace("{DATE}", today())
-
-        /**
-         * Prompt RAG — có context từ database.
-         * Ngắn gọn: system block + context + câu hỏi.
-         */
-        private fun buildRagWithContextPrompt(query: String, contexts: List<String>): String {
-            val ctx = contexts.mapIndexed { i, c -> "[${i+1}] $c" }.joinToString("\n")
-            return "${buildSystemBlock()}\n\nTài liệu tham khảo:\n$ctx\n\nNgười dùng: $query"
-        }
-
-        /**
-         * Prompt RAG — không tìm được context.
-         */
-        private fun buildRagNoContextPrompt(query: String) =
-            "${buildSystemBlock()}\n\nNgười dùng: $query"
-
-        /**
-         * Prompt General — câu hỏi tổng quát, không liên quan MISA.
-         */
-        private fun buildGeneralPrompt(query: String) =
-            "${buildSystemBlock()}\n\nNgười dùng: $query"
     }
+
+    // ── Prompt suffix — appended to every prompt when noThink = true ──────
+    // Qwen3 0.6B defaults to thinking mode; /no_think disables it per-turn.
+    private val promptSuffix = if (noThink) "\n/no_think" else ""
+
+    private fun buildRagWithContextPrompt(query: String, contexts: List<String>): String {
+        val ctx = contexts.mapIndexed { i, c -> "[${i+1}] $c" }.joinToString("\n")
+        return "${buildSystemBlock()}\n\nTài liệu tham khảo:\n$ctx\n\nNgười dùng: $query$promptSuffix"
+    }
+
+    private fun buildRagNoContextPrompt(query: String) =
+        "${buildSystemBlock()}\n\nNgười dùng: $query$promptSuffix"
+
+    private fun buildGeneralPrompt(query: String) =
+        "${buildSystemBlock()}\n\nNgười dùng: $query$promptSuffix"
 
     // ── Conversation turn tracking ────────────────────────────────────────
     private var generalTurnCount = 0

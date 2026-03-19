@@ -45,6 +45,10 @@ data class BotConfig(
     val llmTopP: Float = 0.8f,
     val llmSystemPrompt: String = "Mày là MISA AVA, trợ lý ảo của MISA. Trả lời tiếng Việt, ngắn gọn.",
 
+    // ── Thinking control ──────────────────────────────────────────────────
+    // Qwen3 0.6B mặc định bật thinking — cần thêm /no_think vào cuối mọi prompt
+    val noThink: Boolean = false,
+
     // ── Piper TTS assets / config ─────────────────────────────────────────
     val piperModelDir: String      = "vits-piper-vi-huongly",
     val piperModelName: String     = "huongly.onnx",
