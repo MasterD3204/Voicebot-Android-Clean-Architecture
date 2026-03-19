@@ -44,6 +44,7 @@ class PiperTtsEngine(
     override var onSpeechStart: (() -> Unit)? = null
     override var onSpeechDone: (() -> Unit)? = null
     override var onAllSpeechDone: (() -> Unit)? = null
+    override var onSynthesisTime: ((ms: Long) -> Unit)? = null
 
     private var tts: OfflineTts? = null
 
@@ -270,6 +271,9 @@ class PiperTtsEngine(
             val audio = engine.generate(text = text, sid = speakerId, speed = speed)
             val elapsed = System.currentTimeMillis() - t0
             Log.d(TAG, "  -> ${audio.samples.size} samples @ ${audio.sampleRate}Hz ( ${elapsed}ms)")
+
+            // Report thời gian synthesize thuần cho utterance đầu tiên
+            if (utteranceId == "utt_0") onSynthesisTime?.invoke(elapsed)
 
             if (audio.samples.isEmpty()) {
                 Log.w(TAG, "⚠ Empty audio for $utteranceId")

@@ -74,6 +74,10 @@ class VoiceBotOrchestrator(
 
     init {
         ttsEngine.onSpeechStart = { setBotBusy(true) }
+        ttsEngine.onSynthesisTime = { ms ->
+            currentMetrics = currentMetrics.copy(ttsSynthesisMs = ms)
+            notifyMetrics()
+        }
         ttsEngine.onAllSpeechDone = {
             if (isTtsQueueComplete) {
                 isTtsQueueComplete = false
@@ -257,10 +261,6 @@ class VoiceBotOrchestrator(
     }
 
     private fun speakText(text: String, id: Int) {
-        if (id == 0) {
-            currentMetrics = currentMetrics.copy(ttsFirstAudioTime = System.currentTimeMillis())
-            notifyMetrics()
-        }
         val isLong = text.trim().split(Regex("\\s+")).count { it.isNotBlank() } >= 8
         CoroutineScope(Dispatchers.Main).launch {
             onTtsStartWithLength?.invoke(isLong)

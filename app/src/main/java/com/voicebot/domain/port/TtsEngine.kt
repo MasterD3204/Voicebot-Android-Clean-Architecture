@@ -11,6 +11,11 @@ interface TtsEngine {
     var onSpeechDone: (() -> Unit)?
     /** Fires once when the entire queued batch is done (no more utterances pending) */
     var onAllSpeechDone: (() -> Unit)?
+    /**
+     * Fires after the first utterance is synthesized, reporting the pure synthesis
+     * time in milliseconds (e.g. Piper's generate() duration). Null if not supported.
+     */
+    var onSynthesisTime: ((ms: Long) -> Unit)?
 
     /**
      * Enqueue [text] for synthesis. [utteranceId] is an opaque tag

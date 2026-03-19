@@ -18,6 +18,7 @@ class AndroidTtsEngine(
     override var onSpeechStart: (() -> Unit)? = null
     override var onSpeechDone: (() -> Unit)? = null
     override var onAllSpeechDone: (() -> Unit)? = null
+    override var onSynthesisTime: ((ms: Long) -> Unit)? = null  // not applicable for Android TTS
 
     private var tts: TextToSpeech? = null
     private var initialized = false
