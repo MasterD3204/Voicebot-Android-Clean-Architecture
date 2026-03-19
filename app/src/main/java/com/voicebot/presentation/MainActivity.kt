@@ -76,8 +76,14 @@ class MainActivity : AppCompatActivity() {
             requestStoragePermission()
         }
 
-        // Khởi tạo 3D avatar
-        avatarController = AvatarController(this, binding.sceneView).also { it.setup() }
+        // Khởi tạo 3D avatar chỉ khi user bật tùy chọn
+        val showAvatar = intent.getBooleanExtra(SetupActivity.EXTRA_SHOW_AVATAR, true)
+        if (showAvatar) {
+            binding.sceneView.visibility = android.view.View.VISIBLE
+            avatarController = AvatarController(this, binding.sceneView).also { it.setup() }
+        } else {
+            binding.sceneView.visibility = android.view.View.GONE
+        }
     }
 
     override fun onResume() {

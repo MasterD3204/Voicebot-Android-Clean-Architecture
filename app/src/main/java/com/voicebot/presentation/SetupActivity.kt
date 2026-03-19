@@ -36,6 +36,7 @@ class SetupActivity : AppCompatActivity() {
         const val EXTRA_STT_TYPE           = "extra_stt_type"
         const val EXTRA_RAG_TYPE           = "extra_rag_type"
         const val EXTRA_TTS_TYPE           = "extra_tts_type"
+        const val EXTRA_SHOW_AVATAR        = "extra_show_avatar"
 
         // /sdcard/Download/ — nơi user đặt tất cả model file
         private val DOWNLOAD_DIRS = listOf(
@@ -225,6 +226,7 @@ class SetupActivity : AppCompatActivity() {
                 putExtra(EXTRA_STT_TYPE,       sttType.name)
                 putExtra(EXTRA_RAG_TYPE,       ragType.name)
                 putExtra(EXTRA_TTS_TYPE,       ttsType.name)
+                putExtra(EXTRA_SHOW_AVATAR,    binding.switchAvatar.isChecked)
             }
         )
         finish()
