@@ -20,14 +20,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Avatar mode: hiển thị text nhỏ phía trên SceneView -->
     <TextView
         android:id="@+id/tvUserTalk"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:text=""
-        android:textColor="#F9FAFB"
-        android:textSize="14sp"
+        android:textColor="#9CA3AF"
+        android:textSize="13sp"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/tvStatus" />
@@ -37,18 +39,19 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="16dp"
         android:text=""
         android:maxLines="5"
         android:textColor="#F9FAFB"
         android:textSize="18sp"
         android:gravity="center"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/tvUserTalk" />
 
-    <!-- Metrics Panel -->
+    <!-- Metrics Panel — luôn hiển thị phía trên content -->
     <LinearLayout
         android:visibility="visible"
         android:id="@+id/metricsPanel"
@@ -59,7 +62,7 @@
         android:orientation="horizontal"
         android:padding="8dp"
         android:weightSum="3"
-        app:layout_constraintTop_toBottomOf="@id/tvUserTalk">
+        app:layout_constraintTop_toBottomOf="@id/tvStatus">
 
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvMetricQuery" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0ms" android:textColor="#10B981" android:textSize="16sp" android:textStyle="bold"/>
@@ -77,19 +80,22 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Chat List -->
+    <!-- Chat mode: RecyclerView fill toàn bộ space giữa metrics và bottom bar -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvChat"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
         android:clipToPadding="false"
-        android:paddingBottom="16dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="8dp"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/bottomControls"
         app:layout_constraintTop_toBottomOf="@id/metricsPanel" />
 
+    <!-- Avatar mode: SceneView overlay toàn màn hình phía sau các view khác -->
     <io.github.sceneview.SceneView
         android:layout_marginTop="100dp"
         android:id="@+id/sceneView"

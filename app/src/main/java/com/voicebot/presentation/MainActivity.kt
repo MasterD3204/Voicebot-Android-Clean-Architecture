@@ -22,6 +22,8 @@ import com.voicebot.domain.model.LlmType
 import com.voicebot.domain.model.RagType
 import com.voicebot.domain.model.SttType
 import com.voicebot.domain.model.TtsType
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -40,8 +42,14 @@ class MainActivity : AppCompatActivity() {
     private var isInitializing     = false
     private var silenceTimeoutJob: Job? = null
 
+    // ── Display mode (set once in onCreate, immutable afterwards) ─────────
+    private var showAvatar = true
+
     // ── Optional 3D avatar (null = no avatar, non-null = avatar enabled) ──
     private var avatarController: AvatarController? = null
+
+    // ── Chat mode adapter (used only when showAvatar = false) ─────────────
+    private val chatAdapter = ChatAdapter()
 
     // ── Permission launchers ──────────────────────────────────────────────
 
@@ -66,6 +74,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivitySecondBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        showAvatar = intent.getBooleanExtra(SetupActivity.EXTRA_SHOW_AVATAR, true)
+
+        setupDisplayMode()
         setupButtons()
         startBotStateObserver()
 
@@ -75,14 +86,28 @@ class MainActivity : AppCompatActivity() {
         } else {
             requestStoragePermission()
         }
+    }
 
-        // Khởi tạo 3D avatar chỉ khi user bật tùy chọn
-        val showAvatar = intent.getBooleanExtra(SetupActivity.EXTRA_SHOW_AVATAR, true)
+    // ── Display mode setup ────────────────────────────────────────────────
+
+    private fun setupDisplayMode() {
         if (showAvatar) {
-            binding.sceneView.visibility = android.view.View.VISIBLE
+            // Avatar mode: SceneView hiển thị, RecyclerView ẩn, tvUserTalk/tvBotTalk hiển thị
+            binding.sceneView.visibility  = android.view.View.VISIBLE
+            binding.rvChat.visibility     = android.view.View.GONE
+            binding.tvUserTalk.visibility = android.view.View.VISIBLE
+            binding.tvBotTalk.visibility  = android.view.View.VISIBLE
             avatarController = AvatarController(this, binding.sceneView).also { it.setup() }
         } else {
-            binding.sceneView.visibility = android.view.View.GONE
+            // Chat mode: SceneView ẩn, RecyclerView hiển thị, tvUserTalk/tvBotTalk ẩn
+            binding.sceneView.visibility  = android.view.View.GONE
+            binding.tvUserTalk.visibility = android.view.View.GONE
+            binding.tvBotTalk.visibility  = android.view.View.GONE
+            binding.rvChat.visibility     = android.view.View.VISIBLE
+            binding.rvChat.layoutManager = LinearLayoutManager(this).apply {
+                stackFromEnd = true   // scroll mới nhất ở cuối
+            }
+            binding.rvChat.adapter = chatAdapter
         }
     }
 
@@ -239,11 +264,35 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        orchestrator.onLog = { msg, _ ->
+        orchestrator.onLog = { msg, isUpdate ->
             runOnUiThread {
-                when {
-                    msg.startsWith("User:") -> binding.tvUserTalk.text = msg.removePrefix("User:").trim()
-                    msg.startsWith("Bot:")  -> binding.tvBotTalk.text  = msg.removePrefix("Bot:").trim()
+                if (showAvatar) {
+                    // Avatar mode: text overlay nhỏ phía trên SceneView
+                    when {
+                        msg.startsWith("User:") -> binding.tvUserTalk.text = msg.removePrefix("User:").trim()
+                        msg.startsWith("Bot:")  -> binding.tvBotTalk.text  = msg.removePrefix("Bot:").trim()
+                    }
+                } else {
+                    // Chat mode: đẩy vào RecyclerView
+                    when {
+                        msg.startsWith("User:") -> {
+                            // Mỗi lần nói mới = tin nhắn mới
+                            if (!isUpdate) chatAdapter.addMessage(msg)
+                            else chatAdapter.updateLastMessage(msg)
+                        }
+                        msg.startsWith("Bot:") -> {
+                            // Stream: update in-place nếu isUpdate, thêm mới nếu không
+                            if (!isUpdate) chatAdapter.addMessage(msg)
+                            else chatAdapter.updateLastMessage(msg)
+                        }
+                        msg.startsWith("System:") -> {
+                            // Thông báo hệ thống (khởi tạo, lỗi) — thêm như bot message
+                            if (!isUpdate) chatAdapter.addMessage("Bot: ${ msg.removePrefix("System:").trim() }")
+                            else chatAdapter.updateLastMessage("Bot: ${ msg.removePrefix("System:").trim() }")
+                        }
+                    }
+                    // Auto-scroll xuống cuối
+                    binding.rvChat.scrollToPosition(chatAdapter.itemCount - 1)
                 }
             }
         }
@@ -266,8 +315,12 @@ class MainActivity : AppCompatActivity() {
         orchestrator.onAllSpeechComplete = {
             runOnUiThread {
                 avatarController?.onAllSpeechDone()
-                binding.tvBotTalk.text  = ""
-                binding.tvUserTalk.text = ""
+                if (showAvatar) {
+                    // Avatar mode: xóa overlay text sau khi nói xong
+                    binding.tvBotTalk.text  = ""
+                    binding.tvUserTalk.text = ""
+                }
+                // Chat mode: giữ nguyên lịch sử chat
             }
         }
     }
@@ -305,8 +358,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnClear.setOnClickListener {
-            binding.tvUserTalk.text = ""
-            binding.tvBotTalk.text  = ""
+            if (showAvatar) {
+                binding.tvUserTalk.text = ""
+                binding.tvBotTalk.text  = ""
+            } else {
+                chatAdapter.clear()
+            }
             orchestrator.reset()
             if (isListeningEnabled) toggleListening(false)
         }

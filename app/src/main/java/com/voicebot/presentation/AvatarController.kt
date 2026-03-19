@@ -128,9 +128,23 @@ class AvatarController(
      * Releases all animation resources. Call from Activity.onDestroy().
      */
     fun destroy() {
-        stopHologramScan()
+        // Cancel animators TRƯỚC để listener không tiếp tục truy cập node sau khi Scene bị destroy
+        scanAnimator?.cancel()
+        scanAnimator = null
         talkSwayAnimator?.cancel()
         talkSwayAnimator = null
+        sceneView.onFrame = null
+
+        // Chỉ remove nodes nếu SceneView còn attached — Filament Scene có thể đã bị destroy
+        if (sceneView.isAttachedToWindow) {
+            stopHologramScan()
+        } else {
+            // Scene đã destroy — chỉ null out references, không gọi removeChildNode
+            isScanningActive = false
+            scanLight1 = null
+            scanLight2 = null
+            scanLight3 = null
+        }
     }
 
     // ── SceneView setup ───────────────────────────────────────────────────
@@ -265,6 +279,7 @@ class AvatarController(
     private fun setupAnimationLoop() {
         var lastFrameTime = System.nanoTime()
         sceneView.onFrame = { _ ->
+            if (!sceneView.isAttachedToWindow) return@onFrame
             modelNode?.modelInstance?.animator?.let { animator ->
                 if (animator.animationCount > 0 && currentAnimationIndex < animator.animationCount) {
                     val currentTime = System.nanoTime()
@@ -447,20 +462,28 @@ class AvatarController(
     }
 
     private fun stopHologramScan() {
-        try {
-            if (!isScanningActive) return
-            isScanningActive = false
-            scanAnimator?.cancel()
-            scanAnimator = null
-            scanLight1?.let { sceneView.removeChildNode(it) }
-            scanLight2?.let { sceneView.removeChildNode(it) }
-            scanLight3?.let { sceneView.removeChildNode(it) }
+        if (!isScanningActive) return
+        isScanningActive = false
+        scanAnimator?.cancel()
+        scanAnimator = null
+        // Guard: SceneView/Filament Scene có thể đã bị destroy khi Activity đang tắt
+        if (!sceneView.isAttachedToWindow) {
             scanLight1 = null
             scanLight2 = null
             scanLight3 = null
+            return
+        }
+        try {
+            scanLight1?.let { sceneView.removeChildNode(it) }
+            scanLight2?.let { sceneView.removeChildNode(it) }
+            scanLight3?.let { sceneView.removeChildNode(it) }
             Log.i(TAG, "🛑 Hologram scan animation stopped")
         } catch (e: Exception) {
-            Log.e(TAG, "stopHologramScan error", e)
+            Log.w(TAG, "stopHologramScan: removeChildNode skipped (Scene already destroyed)", e)
+        } finally {
+            scanLight1 = null
+            scanLight2 = null
+            scanLight3 = null
         }
     }
 }
