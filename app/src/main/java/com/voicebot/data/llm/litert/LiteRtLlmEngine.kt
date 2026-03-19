@@ -24,7 +24,9 @@ class LiteRtLlmEngine(
     private val maxTokens: Int = 1024,
     private val temperature: Float = 0.1f,
     private val topK: Int = 8,
-    private val topP: Float = 0.95f
+    private val topP: Float = 0.95f,
+    /** Khi true: tự quản lý history để tránh LiteRT Jinja crash trên <think> tokens */
+    private val noThink: Boolean = false
 ) : LlmEngine {
 
     companion object { private const val TAG = "LiteRtLlmEngine" }
@@ -32,6 +34,15 @@ class LiteRtLlmEngine(
     private var engine: Engine? = null
     private var conversation: Conversation? = null
     private var initialized = false
+
+    /**
+     * Manual history dùng khi noThink=true.
+     * Mỗi entry: (userMessage, assistantReply đã strip <think>).
+     * Được replay vào Conversation fresh trước mỗi turn.
+     */
+    private val manualHistory = mutableListOf<Pair<String, String>>()
+    /** Buffer tích lũy reply của turn hiện tại để lưu vào manualHistory sau khi stream xong */
+    private val currentReplyBuf = StringBuilder()
 
     override fun isReady() = initialized && conversation != null
 
@@ -132,15 +143,49 @@ class LiteRtLlmEngine(
 
 
     override fun chatStream(query: String): Flow<String> = callbackFlow {
-        val conv = conversation ?: run { trySend("Lỗi: Model chưa khởi tạo."); close(); return@callbackFlow }
-        conv.sendMessageAsync(Contents.of(Content.Text(query)), object : MessageCallback {
-            override fun onMessage(msg: Message) { trySend(msg.toString()) }
-            override fun onDone() { close() }
-            override fun onError(t: Throwable) {
-                if (t is CancellationException) close()
-                else { trySend("\n[Lỗi: ${t.message}]"); close() }
+        if (noThink) {
+            // ── noThink mode: manual history ──────────────────────────────
+            // Reset Conversation để tránh <think> tokens tích lũy trong native context
+            val freshConv = createFreshConversation() ?: run {
+                trySend("Lỗi: Không thể tạo conversation."); close(); return@callbackFlow
             }
-        })
+            conversation = freshConv
+
+            // Replay history sạch (đã strip <think>) vào Conversation mới
+            // Dùng format few-shot: ghép tất cả turns trước + câu hỏi hiện tại thành 1 message
+            val fullPrompt = buildReplayPrompt(query)
+            currentReplyBuf.clear()
+
+            freshConv.sendMessageAsync(Contents.of(Content.Text(fullPrompt)), object : MessageCallback {
+                override fun onMessage(msg: Message) {
+                    val token = msg.toString()
+                    currentReplyBuf.append(token)
+                    trySend(token)
+                }
+                override fun onDone() {
+                    // Lưu reply đã strip <think> vào manual history
+                    val cleanReply = stripThinkTags(currentReplyBuf.toString())
+                    manualHistory.add(Pair(query, cleanReply))
+                    Log.d(TAG, "History saved: ${manualHistory.size} turns")
+                    close()
+                }
+                override fun onError(t: Throwable) {
+                    if (t is CancellationException) close()
+                    else { trySend("\n[Lỗi: ${t.message}]"); close() }
+                }
+            })
+        } else {
+            // ── Normal mode: LiteRT native Conversation history ────────────
+            val conv = conversation ?: run { trySend("Lỗi: Model chưa khởi tạo."); close(); return@callbackFlow }
+            conv.sendMessageAsync(Contents.of(Content.Text(query)), object : MessageCallback {
+                override fun onMessage(msg: Message) { trySend(msg.toString()) }
+                override fun onDone() { close() }
+                override fun onError(t: Throwable) {
+                    if (t is CancellationException) close()
+                    else { trySend("\n[Lỗi: ${t.message}]"); close() }
+                }
+            })
+        }
         awaitClose()
     }
 
@@ -148,6 +193,7 @@ class LiteRtLlmEngine(
         runCatching { conversation?.close() }
         runCatching { engine?.close() }
         initialized = false; engine = null; conversation = null
+        manualHistory.clear()
     }
 
     /**
@@ -157,6 +203,8 @@ class LiteRtLlmEngine(
     override fun resetHistory() {
         val eng = engine ?: return
         runCatching { conversation?.close() }
+        manualHistory.clear()
+        currentReplyBuf.clear()
         conversation = try {
             eng.createConversation(
                 ConversationConfig(
@@ -168,4 +216,55 @@ class LiteRtLlmEngine(
             Log.e(TAG, "resetHistory failed", e); null
         }
     }
-}
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private fun createFreshConversation(): Conversation? {
+        val eng = engine ?: return null
+        runCatching { conversation?.close() }
+        return try {
+            eng.createConversation(
+                ConversationConfig(
+                    samplerConfig = SamplerConfig(topK, topP.toDouble(), temperature.toDouble()),
+                    systemInstruction = Contents.of(Content.Text(systemPrompt))
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "createFreshConversation failed", e); null
+        }
+    }
+
+    /**
+     * Build prompt chứa toàn bộ history sạch + câu hỏi mới.
+     * Format: "User: ...\nAssistant: ...\nUser: ...\nAssistant: ..." (few-shot style)
+     * Gửi như 1 message duy nhất vào Conversation fresh để tránh Jinja template bug.
+     */
+    private fun buildReplayPrompt(currentQuery: String): String {
+        if (manualHistory.isEmpty()) return currentQuery
+        val sb = StringBuilder()
+        for ((user, assistant) in manualHistory) {
+            sb.append("User: $user\nAssistant: $assistant\n")
+        }
+        sb.append("User: $currentQuery")
+        return sb.toString()
+    }
+
+    /**
+     * Strip tất cả <think>...</think> blocks khỏi text.
+     * Dùng để làm sạch reply trước khi lưu vào manualHistory.
+     */
+    private fun stripThinkTags(text: String): String {
+        var result = text
+        // Loop để xử lý nhiều block lồng nhau hoặc liên tiếp
+        while (result.contains("<think>")) {
+            val open  = result.indexOf("<think>")
+            val close = result.indexOf("</think>", open)
+            result = if (close == -1) {
+                // Tag mở nhưng chưa đóng — xóa từ <think> đến hết
+                result.substring(0, open)
+            } else {
+                result.substring(0, open) + result.substring(close + "</think>".length)
+            }
+        }
+        return result.trim()
+    }

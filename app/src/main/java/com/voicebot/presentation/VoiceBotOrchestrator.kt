@@ -188,6 +188,9 @@ class VoiceBotOrchestrator(
     private suspend fun consumeStream(flow: Flow<String>) {
         val fullText = StringBuilder()
         val sentenceBuf = StringBuilder()
+        // Buffer tích lũy để detect tag <think>...</think> dù token bị split
+        val thinkBuf = StringBuilder()
+        var inThinkBlock = false
 
         flow.collect { chunk ->
             if (isFirstToken) {
@@ -199,15 +202,23 @@ class VoiceBotOrchestrator(
                 notifyMetrics()
                 isFirstToken = false
             }
-            fullText.append(chunk)
-            logToUI("Bot: $fullText", true)  // Hiển thị text gốc trên màn hình
-            sentenceBuf.append(chunk)
 
-            // Thử cắt chunk đủ điều kiện: ≥ MIN_CHUNK_WORDS TỪ + kết thúc bằng dấu ngắt
-            var readyChunk = cutReadyChunk(sentenceBuf)
-            while (readyChunk != null) {
-                speakText(readyChunk, sentenceCount++)
-                readyChunk = cutReadyChunk(sentenceBuf)
+            thinkBuf.append(chunk)
+            // Xử lý thinkBuf: strip mọi <think>...</think> block, lấy phần còn lại
+            val cleaned = stripThinkBlocks(thinkBuf, inThinkBlock)
+            inThinkBlock = cleaned.second
+            val visibleChunk = cleaned.first
+
+            if (visibleChunk.isNotEmpty()) {
+                fullText.append(visibleChunk)
+                logToUI("Bot: $fullText", true)
+                sentenceBuf.append(visibleChunk)
+
+                var readyChunk = cutReadyChunk(sentenceBuf)
+                while (readyChunk != null) {
+                    speakText(readyChunk, sentenceCount++)
+                    readyChunk = cutReadyChunk(sentenceBuf)
+                }
             }
         }
 
@@ -218,6 +229,46 @@ class VoiceBotOrchestrator(
         }
 
         finalizeTtsQueue()
+    }
+
+    /**
+     * Strip tất cả <think>...</think> block khỏi [buf].
+     * Trả về (visibleText, isStillInThinkBlock) để state được carry sang chunk tiếp theo.
+     * Sau khi xử lý xong, buf được xóa (đã tiêu thụ hết).
+     */
+    private fun stripThinkBlocks(buf: StringBuilder, wasInThink: Boolean): Pair<String, Boolean> {
+        val text = buf.toString()
+        buf.clear()
+
+        val result = StringBuilder()
+        var i = 0
+        var inThink = wasInThink
+
+        while (i < text.length) {
+            if (inThink) {
+                val closeIdx = text.indexOf("</think>", i)
+                if (closeIdx == -1) {
+                    // Chưa tìm thấy </think> — toàn bộ phần còn lại là thinking, bỏ qua hết
+                    return Pair(result.toString(), true)
+                }
+                // Tìm thấy </think> — nhảy qua
+                i = closeIdx + "</think>".length
+                inThink = false
+            } else {
+                val openIdx = text.indexOf("<think>", i)
+                if (openIdx == -1) {
+                    // Không có <think> nào nữa — lấy hết phần còn lại
+                    result.append(text.substring(i))
+                    break
+                }
+                // Lấy phần trước <think>
+                result.append(text.substring(i, openIdx))
+                i = openIdx + "<think>".length
+                inThink = true
+            }
+        }
+
+        return Pair(result.toString(), inThink)
     }
 
     /**

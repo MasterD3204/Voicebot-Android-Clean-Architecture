@@ -49,7 +49,8 @@ object EngineFactory {
                 maxTokens = config.llmMaxTokens,
                 temperature = config.llmTemperature,
                 topK = config.llmTopK,
-                topP = config.llmTopP
+                topP = config.llmTopP,
+                noThink = config.noThink
             )
             LlmType.GEMINI_API -> GeminiLlmEngine(
                 apiKey = config.geminiApiKey,
