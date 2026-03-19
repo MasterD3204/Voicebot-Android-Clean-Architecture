@@ -8,10 +8,10 @@ data class OfflineTtsVitsModelConfig(
     var lexicon: String = "",
     var tokens: String = "",
     var dataDir: String = "",
-    var dictDir: String = "", // unused
+    var dictDir: String = "",
     var noiseScale: Float = 0.667f,
     var noiseScaleW: Float = 0.8f,
-    var lengthScale: Float = 1.0f,
+    var lengthScale: Float = 1.2f,
 )
 
 data class OfflineTtsMatchaModelConfig(

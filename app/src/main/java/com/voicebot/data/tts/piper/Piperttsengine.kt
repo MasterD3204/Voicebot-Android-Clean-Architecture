@@ -25,10 +25,10 @@ import java.io.FileOutputStream
 import java.io.IOException
 class PiperTtsEngine(
     private val context: Context,
-    private val modelDir: String   = "vits-piper-vi-ngochuyen",
-    private val modelName: String  = "ngochuyen.onnx",
+    private val modelDir: String   = "vits-piper-vi-huongly",
+    private val modelName: String  = "huongly.onnx",
     private val tokensName: String = "tokens.txt",
-    private val espDataDir: String = "vits-piper-vi-ngochuyen/espeak-ng-data",
+    private val espDataDir: String = "vits-piper-vi-huongly/espeak-ng-data",
     private val speakerId: Int     = 0,
     private val speed: Float       = 0.7f,
     private val numThreads: Int    = 2
@@ -70,9 +70,9 @@ class PiperTtsEngine(
 
             // BƯỚC 2: Build config
             val vitsConfig = OfflineTtsVitsModelConfig(
-                model   = "$modelDir/$modelName",       // → "vits-piper-vi-ngochuyen/ngochuyen.onnx"
-                tokens  = "$modelDir/$tokensName",      // → "vits-piper-vi-ngochuyen/tokens.txt"
-                dataDir = externalDataDir               // → "/storage/.../vits-piper-vi-ngochuyen/espeak-ng-data"
+                model   = "$modelDir/$modelName",       // → "vits-piper-vi-huongly/huongly.onnx"
+                tokens  = "$modelDir/$tokensName",      // → "vits-piper-vi-huongly/tokens.txt"
+                dataDir = externalDataDir               // → "/storage/.../vits-piper-vi-huongly/espeak-ng-data"
             )
 
             val modelConfig = OfflineTtsModelConfig(

@@ -371,7 +371,7 @@ public class LibrariesForLibs extends AbstractExternalDependencyFactory {
         public Provider<String> getActivityCompose() { return getVersion("activityCompose"); }
 
         /**
-         * Version alias <b>agp</b> with value <b>8.4.0</b>
+         * Version alias <b>agp</b> with value <b>8.7.3</b>
          * <p>
          * If the version is a rich version and cannot be represented as a
          * single version string, an empty string is returned.
@@ -391,7 +391,7 @@ public class LibrariesForLibs extends AbstractExternalDependencyFactory {
         public Provider<String> getComposeBom() { return getVersion("composeBom"); }
 
         /**
-         * Version alias <b>coreKtx</b> with value <b>1.10.0</b>
+         * Version alias <b>coreKtx</b> with value <b>1.15.0</b>
          * <p>
          * If the version is a rich version and cannot be represented as a
          * single version string, an empty string is returned.

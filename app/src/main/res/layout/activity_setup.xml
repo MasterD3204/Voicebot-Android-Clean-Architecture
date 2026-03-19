@@ -202,7 +202,7 @@
                 android:buttonTint="#10B981" android:paddingStart="8dp" android:checked="true"/>
             <RadioButton android:id="@+id/rbTtsPiper"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Piper TTS  (offline, cần ngochuyen.onnx)" android:textColor="#E5E7EB"
+                android:text="Piper TTS  (offline, cần huongly.onnx)" android:textColor="#E5E7EB"
                 android:buttonTint="#10B981" android:paddingStart="8dp"/>
         </RadioGroup>
 

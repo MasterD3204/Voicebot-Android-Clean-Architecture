@@ -46,10 +46,10 @@ data class BotConfig(
     val llmSystemPrompt: String = "Bạn là trợ lý ảo trả lời các câu hỏi của người dùng bằng kiến thức của mình. Hạn chế trả lời không biết khi câu hỏi có thể trả lời được.",
 
     // ── Piper TTS assets / config ─────────────────────────────────────────
-    val piperModelDir: String      = "vits-piper-vi-ngochuyen",
-    val piperModelName: String     = "ngochuyen.onnx",
+    val piperModelDir: String      = "vits-piper-vi-huongly",
+    val piperModelName: String     = "huongly.onnx",
     val piperTokensName: String    = "tokens.txt",
-    val piperEspDataDir: String    = "vits-piper-vi-ngochuyen/espeak-ng-data",
+    val piperEspDataDir: String    = "vits-piper-vi-huongly/espeak-ng-data",
     val piperSpeakerId: Int        = 0,
     val piperSpeed: Float          = 1.0f,
     val piperNumThreads: Int       = 4
