@@ -39,16 +39,9 @@
             </intent-filter>
         </activity>
 
-        <!-- MainActivity: màn hình chat chính -->
+        <!-- MainActivity: màn hình chính với voicebot + 3D avatar -->
         <activity
             android:name="com.voicebot.presentation.MainActivity"
-            android:exported="false"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.SimulateStreamingAsr" />
-
-        <!-- SecondActivity: bản clone của MainActivity -->
-        <activity
-            android:name="com.voicebot.presentation.SecondActivity"
             android:exported="false"
             android:label="@string/app_name"
             android:theme="@style/Theme.SimulateStreamingAsr" />

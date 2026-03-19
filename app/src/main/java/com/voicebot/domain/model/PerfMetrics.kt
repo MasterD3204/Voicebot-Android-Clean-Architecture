@@ -1,11 +1,11 @@
 package com.voicebot.domain.model
 
 data class PerfMetrics(
-    var sttEndTime: Long = 0L,
-    var llmFirstTokenTime: Long = 0L,
-    var ttsFirstAudioTime: Long = 0L,
-    var queryEndTime: Long = 0L,
-    var firstChunkReceivedTime: Long = 0L
+    val sttEndTime: Long = 0L,
+    val llmFirstTokenTime: Long = 0L,
+    val ttsFirstAudioTime: Long = 0L,
+    val queryEndTime: Long = 0L,
+    val firstChunkReceivedTime: Long = 0L
 ) {
     fun getLlmLatency(): Long =
         if (llmFirstTokenTime > sttEndTime) llmFirstTokenTime - sttEndTime else 0L

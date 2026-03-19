@@ -21,6 +21,7 @@ import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.io.FileOutputStream
 import java.io.IOException
 class PiperTtsEngine(
@@ -52,6 +53,12 @@ class PiperTtsEngine(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var worker: Job? = null
     private val playLock = Any()
+
+    // ── Queue completion tracking (mirrors AndroidTtsEngine pattern) ──────
+    private val lock = Any()
+    private val queuedCount = AtomicInteger(0)
+    private val doneCount   = AtomicInteger(0)
+    private var queueMarkedComplete = false
 
     // ── Init ──────────────────────────────────────────────────
 
@@ -184,6 +191,7 @@ class PiperTtsEngine(
         }
         if (text.isBlank()) return
         Log.d(TAG, "▶ Enqueue [$utteranceId]: \"${text.take(50)}\"")
+        queuedCount.incrementAndGet()
         queue.offer(text.trim() to utteranceId)
     }
 
@@ -197,19 +205,44 @@ class PiperTtsEngine(
             audioTrack?.release()
             audioTrack = null
         }
+        resetCounters()
         onSpeechDone?.invoke()
     }
 
-    override fun markQueueComplete() { }
+    override fun markQueueComplete() {
+        val shouldFire = synchronized(lock) {
+            queueMarkedComplete = true
+            doneCount.get() >= queuedCount.get()
+        }
+        if (shouldFire) onAllSpeechDone?.invoke()
+    }
 
     override fun isSpeaking(): Boolean = isSpeakingFlag.get()
 
     override fun shutdown() {
         stop()
         worker?.cancel()
+        scope.cancel()
         tts?.free()
         tts = null
         Log.i(TAG, "Piper TTS shutdown")
+    }
+
+    private fun notifyDone() {
+        onSpeechDone?.invoke()
+        val shouldFire = synchronized(lock) {
+            val done = doneCount.incrementAndGet()
+            queueMarkedComplete && done >= queuedCount.get()
+        }
+        if (shouldFire) onAllSpeechDone?.invoke()
+    }
+
+    private fun resetCounters() {
+        synchronized(lock) {
+            queuedCount.set(0)
+            doneCount.set(0)
+            queueMarkedComplete = false
+        }
     }
 
     private fun startWorker() {
@@ -233,14 +266,14 @@ class PiperTtsEngine(
 
             if (audio.samples.isEmpty()) {
                 Log.w(TAG, "⚠ Empty audio for $utteranceId")
-                if (queue.isEmpty()) onSpeechDone?.invoke()
+                notifyDone()
                 return
             }
             playAudio(audio.samples, audio.sampleRate, utteranceId)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Synthesis failed [$utteranceId]", e)
             isSpeakingFlag.set(false)
-            if (queue.isEmpty()) onSpeechDone?.invoke()
+            notifyDone()
         }
     }
 
@@ -258,7 +291,7 @@ class PiperTtsEngine(
 
             if (minBuf <= 0) {
                 Log.e(TAG, "❌ getMinBufferSize=$minBuf")
-                if (queue.isEmpty()) onSpeechDone?.invoke()
+                notifyDone()
                 return
             }
 
@@ -286,14 +319,14 @@ class PiperTtsEngine(
                     .build()
             } catch (e: Exception) {
                 Log.e(TAG, "❌ AudioTrack.Builder failed", e)
-                if (queue.isEmpty()) onSpeechDone?.invoke()
+                notifyDone()
                 return
             }
 
             if (track.state != AudioTrack.STATE_INITIALIZED) {
                 Log.e(TAG, "❌ AudioTrack NOT initialized!")
                 track.release()
-                if (queue.isEmpty()) onSpeechDone?.invoke()
+                notifyDone()
                 return
             }
 
@@ -334,7 +367,7 @@ class PiperTtsEngine(
             if (audioTrack === track) audioTrack = null
             isSpeakingFlag.set(false)
 
-            if (queue.isEmpty()) onSpeechDone?.invoke()
+            notifyDone()
             Log.d(TAG, "✅ Done utterance: $utteranceId")
         }
     }

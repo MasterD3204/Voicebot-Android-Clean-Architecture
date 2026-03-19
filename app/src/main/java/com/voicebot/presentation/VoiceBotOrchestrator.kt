@@ -142,14 +142,14 @@ class VoiceBotOrchestrator(
             try {
                 when (val result = useCase.execute(text)) {
                     is QueryResult.Acknowledgment -> {
-                        currentMetrics.queryEndTime = System.currentTimeMillis()
+                        currentMetrics = currentMetrics.copy(queryEndTime = System.currentTimeMillis())
                         notifyMetrics()
                         streamWords(result.response)
                         speakText(result.response, 0)
                         finalizeTtsQueue()
                     }
                     is QueryResult.LlmStream -> {
-                        currentMetrics.queryEndTime = System.currentTimeMillis()
+                        currentMetrics = currentMetrics.copy(queryEndTime = System.currentTimeMillis())
                         notifyMetrics()
                         consumeStream(result.flow)
                     }
@@ -185,8 +185,10 @@ class VoiceBotOrchestrator(
         flow.collect { chunk ->
             if (isFirstToken) {
                 val now = System.currentTimeMillis()
-                currentMetrics.llmFirstTokenTime = now
-                currentMetrics.firstChunkReceivedTime = now
+                currentMetrics = currentMetrics.copy(
+                    llmFirstTokenTime = now,
+                    firstChunkReceivedTime = now
+                )
                 notifyMetrics()
                 isFirstToken = false
             }
@@ -221,7 +223,7 @@ class VoiceBotOrchestrator(
 
     private fun speakText(text: String, id: Int) {
         if (id == 0) {
-            currentMetrics.ttsFirstAudioTime = System.currentTimeMillis()
+            currentMetrics = currentMetrics.copy(ttsFirstAudioTime = System.currentTimeMillis())
             notifyMetrics()
         }
         val isLong = text.trim().split(Regex("\\s+")).count { it.isNotBlank() } >= 8

@@ -16,13 +16,13 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.voicebot.databinding.ActivityMainBinding
+import com.voicebot.databinding.ActivitySecondBinding
 import com.voicebot.domain.model.BotConfig
 import com.voicebot.domain.model.LlmType
 import com.voicebot.domain.model.RagType
 import com.voicebot.domain.model.SttType
 import com.voicebot.domain.model.TtsType
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -30,14 +30,17 @@ class MainActivity : AppCompatActivity() {
 
     companion object { private const val TAG = "MainActivity" }
 
-    private lateinit var binding: ActivityMainBinding
+    private lateinit var binding: ActivitySecondBinding
     private lateinit var orchestrator: VoiceBotOrchestrator
-    private lateinit var chatAdapter: ChatAdapter
 
     private var isListeningEnabled = false
     private var isMicActive        = false
     private var isInitialized      = false
-    private var isInitializing     = false   // ← guard tránh double init
+    private var isInitializing     = false
+    private var silenceTimeoutJob: Job? = null
+
+    // ── Optional 3D avatar (null = no avatar, non-null = avatar enabled) ──
+    private var avatarController: AvatarController? = null
 
     // ── Permission launchers ──────────────────────────────────────────────
 
@@ -59,10 +62,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
+        binding = ActivitySecondBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupRecyclerView()
         setupButtons()
         startBotStateObserver()
 
@@ -72,12 +74,13 @@ class MainActivity : AppCompatActivity() {
         } else {
             requestStoragePermission()
         }
+
+        // Khởi tạo 3D avatar
+        avatarController = AvatarController(this, binding.sceneView).also { it.setup() }
     }
 
     override fun onResume() {
         super.onResume()
-        // Chỉ init khi quay lại từ Settings (cấp MANAGE_EXTERNAL_STORAGE)
-        // isInitializing guard tránh chạy lại khi onResume kế tiếp ngay sau onCreate
         if (!isInitialized && !isInitializing && hasStoragePermission()) {
             setupOrchestrator()
             initOrchestrator()
@@ -86,15 +89,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        avatarController?.destroy()
+        avatarController = null
         releaseOrchestrator()
     }
 
     // ── Resource management ───────────────────────────────────────────────
 
-    /**
-     * Giải phóng TOÀN BỘ tài nguyên: coroutine scope, STT, TTS, RAG, LLM.
-     * Gọi trước khi quay về SetupActivity hoặc khi Activity bị destroy.
-     */
     private fun releaseOrchestrator() {
         if (!::orchestrator.isInitialized) return
         try {
@@ -105,27 +106,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Quay về SetupActivity: dừng mic → release tài nguyên → restart fresh.
-     * SetupActivity được tạo mới → không giữ state cũ.
-     * FLAG_CLEAR_TOP đảm bảo không có MainActivity nào còn trong stack.
-     */
     private fun goBackToSetup() {
-        // Dừng mic trước
         if (isListeningEnabled) {
             isListeningEnabled = false
             runCatching { orchestrator.sttEngine.stopListening() }
         }
 
-        // Disable buttons, hiện thông báo
-        binding.btnToggleMic.isEnabled  = false
-        binding.btnClear.isEnabled      = false
-        binding.btnSettings.isEnabled   = false
-        binding.tvStatus.text           = "⏳ Đang giải phóng tài nguyên..."
+        binding.btnToggleMic.isEnabled = false
+        binding.btnClear.isEnabled     = false
+        binding.btnSettings.isEnabled  = false
+        binding.tvStatus.text          = "⏳ Đang giải phóng tài nguyên..."
 
         lifecycleScope.launch {
-            // ⚠️ KHÔNG dùng withContext(IO): SpeechRecognizer.destroy() bắt buộc chạy trên Main thread
-            // Các engine khác (TTS, RAG, LLM) cũng được gọi trên Main — nhanh, không block lâu
             releaseOrchestrator()
             startActivity(
                 Intent(this@MainActivity, SetupActivity::class.java).apply {
@@ -174,15 +166,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── Configuration ─────────────────────────────────────────────────────
 
-    /**
-     * Đọc TẤT CẢ lựa chọn từ SetupActivity qua Intent extras và build BotConfig.
-     *
-     * Mapping:
-     *   LiteRT      → liteRtModelName         = selectedModelName (.litertlm)
-     *   NativeCpp   → nativeLlmModelName       = selectedModelName (.gguf)
-     *   ExecuTorch  → execuTorchFolderName     = selectedModelName (tên folder)
-     *   GeminiAPI   → geminiApiKey             = nhập từ EditText
-     */
     private fun buildBotConfig(): BotConfig {
         val llmType = intent.getStringExtra(SetupActivity.EXTRA_LLM_TYPE)
             ?.let { runCatching { LlmType.valueOf(it) }.getOrNull() }
@@ -191,15 +174,13 @@ class MainActivity : AppCompatActivity() {
         val modelName = intent.getStringExtra(SetupActivity.EXTRA_LLM_MODEL_NAME) ?: ""
         val geminiKey = intent.getStringExtra(SetupActivity.EXTRA_GEMINI_KEY)
             ?.takeIf { it.isNotBlank() }
-            ?: "AIzaSyAsAEaZw4D7y2cESBVoyymdxmV2kKJOZks"
+            ?: ""
         val sttType = intent.getStringExtra(SetupActivity.EXTRA_STT_TYPE)
             ?.let { runCatching { SttType.valueOf(it) }.getOrNull() }
             ?: SttType.ANDROID
-
         val ragType = intent.getStringExtra(SetupActivity.EXTRA_RAG_TYPE)
             ?.let { runCatching { RagType.valueOf(it) }.getOrNull() }
             ?: RagType.FASTTEXT
-
         val ttsType = intent.getStringExtra(SetupActivity.EXTRA_TTS_TYPE)
             ?.let { runCatching { TtsType.valueOf(it) }.getOrNull() }
             ?: TtsType.ANDROID
@@ -210,7 +191,6 @@ class MainActivity : AppCompatActivity() {
             ttsType  = ttsType,
             ragType  = ragType,
             language = "vi-VN",
-            // LLM-specific: chỉ field tương ứng loại mới có giá trị thực
             geminiApiKey           = geminiKey,
             liteRtModelName        = if (llmType == LlmType.LITE_RT)     modelName else BotConfig().liteRtModelName,
             nativeLlmModelName     = if (llmType == LlmType.NATIVE_CPP)  modelName else BotConfig().nativeLlmModelName,
@@ -221,32 +201,43 @@ class MainActivity : AppCompatActivity() {
 
     // ── Setup ─────────────────────────────────────────────────────────────
 
-    private fun setupRecyclerView() {
-        chatAdapter = ChatAdapter()
-        binding.rvChat.apply {
-            layoutManager = LinearLayoutManager(this@MainActivity).apply { stackFromEnd = true }
-            adapter = chatAdapter
-        }
-    }
-
     private fun setupOrchestrator() {
         if (::orchestrator.isInitialized) return
         orchestrator = VoiceBotOrchestrator(this, buildBotConfig())
 
         orchestrator.sttEngine.apply {
-            onListeningStarted = { isMicActive = true;  updateStatusUI() }
-            onListeningStopped = { isMicActive = false; updateStatusUI() }
-            onError            = { isMicActive = false; updateStatusUI() }
-            onResult           = { text ->
+            onListeningStarted = {
+                if (isListeningEnabled) {
+                    isMicActive = true
+                    updateStatusUI()
+                } else {
+                    orchestrator.sttEngine.stopListening()
+                }
+            }
+            onListeningStopped = {
+                isMicActive = false
+                cancelSilenceTimer()
+                updateStatusUI()
+            }
+            onError = {
+                isMicActive = false
+                cancelSilenceTimer()
+                updateStatusUI()
+            }
+            onPartialResult = { _ -> startSilenceTimer() }
+            onResult = { text ->
+                cancelSilenceTimer()
                 Log.i(TAG, "STT result: $text")
                 orchestrator.onUserSpeechFinalized(text)
             }
         }
 
-        orchestrator.onLog = { msg, isUpdate ->
+        orchestrator.onLog = { msg, _ ->
             runOnUiThread {
-                if (isUpdate) chatAdapter.updateLastMessage(msg) else chatAdapter.addMessage(msg)
-                binding.rvChat.scrollToPosition(chatAdapter.itemCount - 1)
+                when {
+                    msg.startsWith("User:") -> binding.tvUserTalk.text = msg.removePrefix("User:").trim()
+                    msg.startsWith("Bot:")  -> binding.tvBotTalk.text  = msg.removePrefix("Bot:").trim()
+                }
             }
         }
         orchestrator.onMetricsUpdate = { metrics ->
@@ -257,6 +248,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
         orchestrator.onBotBusyChanged = { _ -> updateStatusUI() }
+
+        // ── Avatar callbacks (no-op when avatarController is null) ────────
+        orchestrator.onTtsStartWithLength = { isLong ->
+            avatarController?.onTtsStart(isLong)
+        }
+        orchestrator.ttsEngine.onSpeechDone = {
+            avatarController?.onTtsDone()
+        }
+        orchestrator.onAllSpeechComplete = {
+            runOnUiThread {
+                avatarController?.onAllSpeechDone()
+                binding.tvBotTalk.text  = ""
+                binding.tvUserTalk.text = ""
+            }
+        }
     }
 
     private fun initOrchestrator() {
@@ -281,7 +287,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupButtons() {
-        // Mic
         binding.btnToggleMic.setOnClickListener {
             if (isListeningEnabled) toggleListening(false)
             else {
@@ -292,14 +297,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Clear
         binding.btnClear.setOnClickListener {
-            chatAdapter.clear()
+            binding.tvUserTalk.text = ""
+            binding.tvBotTalk.text  = ""
             orchestrator.reset()
             if (isListeningEnabled) toggleListening(false)
         }
 
-        // Settings — quay lại màn hình cấu hình với xác nhận
         binding.btnSettings.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("⚙️ Đổi cấu hình?")
@@ -314,12 +318,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Silence timeout ───────────────────────────────────────────────────
+
+    private fun startSilenceTimer() {
+        silenceTimeoutJob?.cancel()
+        silenceTimeoutJob = lifecycleScope.launch {
+            delay(1000)
+            if (isMicActive) {
+                Log.i(TAG, "🔇 Silence timeout — stopping STT")
+                orchestrator.sttEngine.stopListening()
+            }
+        }
+    }
+
+    private fun cancelSilenceTimer() {
+        silenceTimeoutJob?.cancel()
+        silenceTimeoutJob = null
+    }
+
     // ── Mic control ───────────────────────────────────────────────────────
 
     private fun toggleListening(enable: Boolean) {
         isListeningEnabled = enable
         if (enable) startListeningInternal()
-        else { orchestrator.sttEngine.stopListening(); isMicActive = false }
+        else {
+            cancelSilenceTimer()
+            orchestrator.sttEngine.stopListening()
+            isMicActive = false
+        }
         updateStatusUI()
     }
 
@@ -331,7 +357,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startBotStateObserver() {
         lifecycleScope.launch {
-            while (true) {
+            while (isActive) {
                 if (::orchestrator.isInitialized && isListeningEnabled) {
                     val busy = orchestrator.isBotBusy
                     when {
