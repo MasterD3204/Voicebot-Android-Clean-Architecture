@@ -21,3 +21,4 @@ app/src/main/assets/text_encoder.onnx
 app/src/main/assets/tts_config.json
 app/src/main/assets/vits-piper-vi-huongly
 .gradle
+app/src/main/jniLibs
