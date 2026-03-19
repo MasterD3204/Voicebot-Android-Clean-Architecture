@@ -313,14 +313,33 @@ class VoiceBotOrchestrator(
         ttsEngine.markQueueComplete()
     }
 
-    private fun speakText(text: String, id: Int) {
-        val isLong = text.trim().split(Regex("\\s+")).count { it.isNotBlank() } >= 8
+    private fun speakText(displayText: String, id: Int) {
+        val isLong = displayText.trim().split(Regex("\\s+")).count { it.isNotBlank() } >= 8
         CoroutineScope(Dispatchers.Main).launch {
             onTtsStartWithLength?.invoke(isLong)
         }
-        // Pass raw text — mỗi TTS engine tự normalize theo đặc thù của mình
-        // (PiperTtsEngine dùng PiperTextPreProcessor, AndroidTtsEngine không cần normalize)
-        ttsEngine.speak(text, "utt_$id")
+        // Đổi dấu chấm nội bộ thành phẩy chỉ cho TTS — displayText giữ nguyên cho UI
+        val ttsText = replaceInternalDotsWithCommas(displayText)
+        ttsEngine.speak(ttsText, "utt_$id")
+    }
+
+    /**
+     * Đổi tất cả dấu chấm ở giữa chunk thành dấu phẩy, giữ nguyên dấu chấm cuối cùng.
+     * Piper TTS đọc liền mạch hơn khi câu nối bằng phẩy thay vì chấm.
+     *
+     * Ví dụ:
+     *   "Xin chào. Tôi là AVA."   →  "Xin chào, Tôi là AVA."
+     *   "Xin chào, Tôi là AVA."   →  không đổi (không có dấu chấm nội bộ)
+     *   "Xin chào."               →  không đổi (chỉ 1 dấu chấm ở cuối)
+     */
+    private fun replaceInternalDotsWithCommas(text: String): String {
+        val lastDot = text.lastIndexOf('.')
+        if (lastDot <= 0) return text  // không có dấu chấm, hoặc chỉ có 1 ở đầu
+        val sb = StringBuilder(text)
+        for (i in 0 until lastDot) {
+            if (sb[i] == '.') sb[i] = ','
+        }
+        return sb.toString()
     }
 
     // ── State management ──────────────────────────────────────────────────
