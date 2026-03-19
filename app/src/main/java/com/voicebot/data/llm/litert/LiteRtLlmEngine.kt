@@ -29,7 +29,9 @@ class LiteRtLlmEngine(
     private val noThink: Boolean = false
 ) : LlmEngine {
 
-    companion object { private const val TAG = "LiteRtLlmEngine" }
+    companion object {
+        private const val TAG = "LiteRtLlmEngine"
+    }
 
     private var engine: Engine? = null
     private var conversation: Conversation? = null
@@ -41,6 +43,7 @@ class LiteRtLlmEngine(
      * Được replay vào Conversation fresh trước mỗi turn.
      */
     private val manualHistory = mutableListOf<Pair<String, String>>()
+
     /** Buffer tích lũy reply của turn hiện tại để lưu vào manualHistory sau khi stream xong */
     private val currentReplyBuf = StringBuilder()
 
@@ -88,8 +91,9 @@ class LiteRtLlmEngine(
             val file = File(path)
             val exists = file.exists()
             val readable = file.canRead()
-            Log.d(TAG, "  Path: $path | exists=$exists | readable=$readable" +
-                    if (exists) " | size=${file.length() / (1024 * 1024)} MB" else ""
+            Log.d(
+                TAG, "  Path: $path | exists=$exists | readable=$readable" +
+                        if (exists) " | size=${file.length() / (1024 * 1024)} MB" else ""
             )
         }
 
@@ -156,33 +160,48 @@ class LiteRtLlmEngine(
             val fullPrompt = buildReplayPrompt(query)
             currentReplyBuf.clear()
 
-            freshConv.sendMessageAsync(Contents.of(Content.Text(fullPrompt)), object : MessageCallback {
-                override fun onMessage(msg: Message) {
-                    val token = msg.toString()
-                    currentReplyBuf.append(token)
-                    trySend(token)
-                }
-                override fun onDone() {
-                    // Lưu reply đã strip <think> vào manual history
-                    val cleanReply = stripThinkTags(currentReplyBuf.toString())
-                    manualHistory.add(Pair(query, cleanReply))
-                    Log.d(TAG, "History saved: ${manualHistory.size} turns")
-                    close()
-                }
-                override fun onError(t: Throwable) {
-                    if (t is CancellationException) close()
-                    else { trySend("\n[Lỗi: ${t.message}]"); close() }
-                }
-            })
+            freshConv.sendMessageAsync(
+                Contents.of(Content.Text(fullPrompt)),
+                object : MessageCallback {
+                    override fun onMessage(msg: Message) {
+                        val token = msg.toString()
+                        currentReplyBuf.append(token)
+                        trySend(token)
+                    }
+
+                    override fun onDone() {
+                        // Lưu reply đã strip <think> vào manual history
+                        val cleanReply = stripThinkTags(currentReplyBuf.toString())
+                        manualHistory.add(Pair(query, cleanReply))
+                        Log.d(TAG, "History saved: ${manualHistory.size} turns")
+                        close()
+                    }
+
+                    override fun onError(t: Throwable) {
+                        if (t is CancellationException) close()
+                        else {
+                            trySend("\n[Lỗi: ${t.message}]"); close()
+                        }
+                    }
+                })
         } else {
             // ── Normal mode: LiteRT native Conversation history ────────────
-            val conv = conversation ?: run { trySend("Lỗi: Model chưa khởi tạo."); close(); return@callbackFlow }
+            val conv = conversation
+                ?: run { trySend("Lỗi: Model chưa khởi tạo."); close(); return@callbackFlow }
             conv.sendMessageAsync(Contents.of(Content.Text(query)), object : MessageCallback {
-                override fun onMessage(msg: Message) { trySend(msg.toString()) }
-                override fun onDone() { close() }
+                override fun onMessage(msg: Message) {
+                    trySend(msg.toString())
+                }
+
+                override fun onDone() {
+                    close()
+                }
+
                 override fun onError(t: Throwable) {
                     if (t is CancellationException) close()
-                    else { trySend("\n[Lỗi: ${t.message}]"); close() }
+                    else {
+                        trySend("\n[Lỗi: ${t.message}]"); close()
+                    }
                 }
             })
         }
@@ -257,7 +276,7 @@ class LiteRtLlmEngine(
         var result = text
         // Loop để xử lý nhiều block lồng nhau hoặc liên tiếp
         while (result.contains("<think>")) {
-            val open  = result.indexOf("<think>")
+            val open = result.indexOf("<think>")
             val close = result.indexOf("</think>", open)
             result = if (close == -1) {
                 // Tag mở nhưng chưa đóng — xóa từ <think> đến hết
@@ -268,3 +287,4 @@ class LiteRtLlmEngine(
         }
         return result.trim()
     }
+}
