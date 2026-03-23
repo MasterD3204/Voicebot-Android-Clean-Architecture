@@ -324,23 +324,20 @@ class VoiceBotOrchestrator(
     }
 
     /**
-     * Đổi tất cả dấu chấm trong chunk thành dấu phẩy trước khi đưa vào TTS.
-     * Piper TTS đọc liền mạch hơn khi các câu nối bằng phẩy thay vì chấm.
+     * Đổi dấu chấm và dấu cảm/hỏi trong chunk thành dấu phẩy trước khi đưa vào TTS.
+     * Piper TTS đọc liền mạch hơn khi các câu nối bằng phẩy.
      *
-     * Lý do đổi TẤT CẢ (không giữ dấu chấm cuối):
-     *   - Chunk có thể kết thúc bằng , hoặc không có dấu chấm cuối
-     *     ví dụ: "Xin chào. Tôi là AVA,"  → lastIndexOf('.') = vị trí chấm duy nhất
-     *     → nếu chỉ đổi những chấm TRƯỚC lastDot thì không có gì được đổi
-     *   - Dấu kết thúc của một utterance là việc Piper nhận hết audio, không phải dấu chấm
+     * Xử lý: . ! ? → ,
+     * PiperTextPreProcessor.cleanSymbols() cũng đổi !? → . nên nếu không xử lý ở đây,
+     * dấu chấm sinh ra từ ! sẽ không được đổi thành phẩy.
      *
      * Ví dụ:
+     *   "Xin chào! Tôi là AVA,"   →  "Xin chào, Tôi là AVA,"
      *   "Xin chào. Tôi là AVA,"   →  "Xin chào, Tôi là AVA,"
-     *   "Xin chào. Tôi là AVA."   →  "Xin chào, Tôi là AVA,"
-     *   "Xin chào, Tôi là AVA."   →  "Xin chào, Tôi là AVA,"
-     *   "Xin chào."               →  "Xin chào,"
+     *   "Xin chào? Tôi là AVA."   →  "Xin chào, Tôi là AVA,"
      */
     private fun replaceInternalDotsWithCommas(text: String): String =
-        text.replace('.', ',')
+        text.replace('.', ',').replace('!', ',').replace('?', ',')
 
     // ── State management ──────────────────────────────────────────────────
 
