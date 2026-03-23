@@ -45,16 +45,61 @@ class PiperTextPreProcessor(context: Context) {
         val merged = mutableMapOf<String, String>()
         try {
             val json = JSONObject(context.assets.open(ASSET_FILE).bufferedReader().readText())
+
+            // Pass 1: load raw values (chưa hyphenate) cho tất cả các key đơn và key nhiều từ
+            val rawMap = mutableMapOf<String, String>()
             json.keys().forEach { cat ->
                 val obj = json.getJSONObject(cat)
                 obj.keys().forEach { key ->
                     val lk = key.lowercase().trim()
-                    if (!merged.containsKey(lk)) {
-                        // Thêm gạch ngang giữa các từ trong phần phiên âm
-                        val hyphenated = obj.getString(key).trim().replace(" ", "-")
-                        merged[lk] = hyphenated
-                    }
+                    if (!rawMap.containsKey(lk)) rawMap[lk] = obj.getString(key).trim()
                 }
+            }
+
+            // Pass 2: build giá trị có gạch ngang, tra từng từ con trong rawMap
+            // để biết chính xác số âm tiết phiên âm của từng từ gốc.
+            //
+            // Ví dụ: key="misa amis vps", rawMap["misa"]="mi sa" (2), rawMap["amis"]="a mít" (2),
+            //        rawMap["vps"]="văn phòng số" (3)
+            //   → "mi-sa a-mít văn-phòng-số"
+            //
+            // Nếu từ con không có trong rawMap (không biết số âm tiết),
+            // fallback: chia đều phần còn lại.
+            rawMap.forEach { (lk, raw) ->
+                val keyWords = lk.split(" ").filter { it.isNotEmpty() }
+                val valueTokens = raw.split(" ").filter { it.isNotEmpty() }
+                val hyphenated = if (keyWords.size <= 1) {
+                    // Từ đơn → nối tất cả âm tiết bằng gạch ngang
+                    valueTokens.joinToString("-")
+                } else {
+                    // Từ ghép → tra từng từ con để biết số âm tiết tương ứng
+                    val groups = mutableListOf<String>()
+                    var idx = 0
+                    for ((i, word) in keyWords.withIndex()) {
+                        val syllableCount = when {
+                            rawMap.containsKey(word) -> {
+                                // Tra số âm tiết từ từ đơn tương ứng
+                                rawMap[word]!!.split(" ").filter { it.isNotEmpty() }.size
+                            }
+                            else -> {
+                                // Không có trong map: chia đều phần còn lại
+                                val remaining = valueTokens.size - idx
+                                val wordsLeft = keyWords.size - i
+                                remaining / wordsLeft
+                            }
+                        }
+                        val end = (idx + syllableCount).coerceAtMost(valueTokens.size)
+                        groups.add(valueTokens.subList(idx, end).joinToString("-"))
+                        idx = end
+                    }
+                    // Nếu còn dư âm tiết (do làm tròn), gắn vào nhóm cuối
+                    if (idx < valueTokens.size) {
+                        val last = groups.removeLast()
+                        groups.add(last + "-" + valueTokens.subList(idx, valueTokens.size).joinToString("-"))
+                    }
+                    groups.joinToString(" ")
+                }
+                merged[lk] = hyphenated
             }
             Log.i(TAG, "Loaded ${merged.size} product replacements (hyphenated)")
         } catch (e: Exception) {
