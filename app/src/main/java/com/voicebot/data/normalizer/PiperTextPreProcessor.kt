@@ -30,11 +30,17 @@ class PiperTextPreProcessor(context: Context) {
         private val DATE_SHORT_PATTERN = Regex("""(?<!\d)(\d{1,2})/(\d{1,2})(?!/\d)(?!\d)""")
         private val NUMBER_PATTERN = Regex("""\d+""")
 
-        private val ELLIPSIS_PATTERN = Regex("""[…]|\.\.\.|[?!]+""")
-        private val SEPARATOR_PATTERN = Regex("""[:;/\\|]""")
-        private val UNWANTED_PATTERN  = Regex("""[^\p{L}\p{N}\s,.]""")
+        private val ELLIPSIS_PATTERN  = Regex("""[…]|\.\.\.|[?!]+""")
+        // Dấu xuống dòng (có thể kèm khoảng trắng/tab) → dấu chấm
+        private val NEWLINE_PATTERN   = Regex("""[ \t]*[\r\n]+[ \t]*""")
+        // Dấu bullet "-" ở đầu dòng (sau khi newline đã thành ".") → bỏ
+        private val BULLET_PATTERN    = Regex("""(?<=\.)\s*-\s*""")
+        // ":" → dấu chấm (kết thúc câu dẫn, ví dụ: "sản phẩm là:")
+        private val COLON_PATTERN     = Regex(""":""")
+        private val SEPARATOR_PATTERN = Regex("""[;/\\|]""")
+        private val UNWANTED_PATTERN  = Regex("""[^\p{L}\p{N}\s,.\-]""")
         private val MULTI_COMMA  = Regex(""",+""")
-        private val MULTI_DOT    = Regex("""\\.+""")
+        private val MULTI_DOT    = Regex("""\.+""")
         private val MULTI_SPACE  = Regex("""\s+""")
     }
 
@@ -127,9 +133,15 @@ class PiperTextPreProcessor(context: Context) {
         var s = text
         // ? ! … ... → dấu chấm
         s = ELLIPSIS_PATTERN.replace(s, ".")
-        // : ; / \ | → dấu phẩy
+        // Xuống dòng → dấu chấm (tạo điểm dừng câu cho TTS)
+        s = NEWLINE_PATTERN.replace(s, ". ")
+        // Dấu bullet "-" ngay sau dấu chấm (do newline vừa chuyển) → bỏ
+        s = BULLET_PATTERN.replace(s, " ")
+        // ":" → dấu chấm (kết thúc câu dẫn, vd: "sản phẩm là:")
+        s = COLON_PATTERN.replace(s, ".")
+        // ; / \ | → dấu phẩy
         s = SEPARATOR_PATTERN.replace(s, ",")
-        // Xóa mọi ký tự không phải chữ, số, khoảng trắng, phẩy, chấm
+        // Xóa mọi ký tự không phải chữ, số, khoảng trắng, phẩy, chấm, gạch ngang
         s = UNWANTED_PATTERN.replace(s, " ")
         // Collapse dấu phẩy/chấm liên tiếp
         s = MULTI_COMMA.replace(s, ",")
